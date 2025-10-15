@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Art Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="main-container">
+        <div id="toolbar">
+            <h2>Tools</h2>
+            <div class="tool">
+                <label for="width-input">Width:</label>
+                <input type="number" id="width-input" value="512" step="32">
+            </div>
+            <div class="tool">
+                <label for="height-input">Height:</label>
+                <input type="number" id="height-input" value="512" step="32">
+            </div>
+            <button id="create-btn">Create Artboard</button>
+            <hr>
+            <div id="shape-tools-container">
+                <div class="tool">
+                    <label for="color-picker">Color:</label>
+                    <input type="color" id="color-picker" value="#000000">
+                </div>
+                <button class="tool-btn" id="rectangle-tool" title="Rectangle">▭</button>
+                <button class="tool-btn" id="circle-tool" title="Circle">○</button>
+                <button class="tool-btn" id="line-tool" title="Line">╱</button>
+            </div>
+            <button class="tool-btn" id="eraser-tool" title="Eraser">⌫</button>
+            <hr>
+            <h4>Guide Grid</h4>
+            <div class="tool">
+                <label for="guide-grid-toggle">Show Guide Grid:</label>
+                <input type="checkbox" id="guide-grid-toggle" checked>
+            </div>
+            <div class="tool">
+                <label for="guide-grid-color-picker">Guide Grid Color:</label>
+                <input type="color" id="guide-grid-color-picker" value="#000000">
+            </div>
+            <hr>
+            <h4>Grid Settings</h4>
+            <div class="tool">
+                <label for="grid-toggle">Show Grid:</label>
+                <input type="checkbox" id="grid-toggle" checked>
+            </div>
+            <div class="tool">
+                <label for="grid-color-picker">Grid Color:</label>
+                <input type="color" id="grid-color-picker" value="#555555">
+            </div>
+            <div class="tool">
+                <label for="snap-toggle">Snap to Grid:</label>
+                <input type="checkbox" id="snap-toggle" checked>
+            </div>
+            <div class="tool">
+                <label for="snap-size-input">Snap Size:</label>
+                <input type="number" id="snap-size-input" value="32" min="4">
+            </div>
+            <hr>
+            <h4>Zoom</h4>
+            <div class="tool">
+                <input type="range" id="zoom-slider" min="10" max="3200" value="100">
+            </div>
+            <button id="reset-zoom-btn">Reset Zoom</button>
+        </div>
+
+        <div id="canvas-container">
+            <div id="viewport">
+                <canvas id="artboard"></canvas>
+            </div>
+        </div>
+
+        <div id="right-panel">
+            <div id="layers-panel" class="panel">
+                <h3>Layers</h3>
+                <div id="layer-list">
+                    <!-- Layers will be added here -->
+                </div>
+                <button id="add-layer-btn">+ New Layer</button>
+            </div>
+            <div id="export-panel" class="panel">
+                <h3>Export</h3>
+                <button id="export-btn">Export as PNG</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

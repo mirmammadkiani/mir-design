@@ -8,93 +8,92 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="main-container">
-        <div id="toolbar">
-            <!-- Canvas Settings -->
-            <div class="tool-group">
-                <h4>Canvas</h4>
-                <div class="tool-row-compact">
-                    <div class="tool tool-row">
-                        <label for="width-input">W</label>
-                        <input type="number" id="width-input" value="512" step="32" title="Width">
-                    </div>
-                    <div class="tool tool-row">
-                        <label for="height-input">H</label>
-                        <input type="number" id="height-input" value="512" step="32" title="Height">
-                    </div>
-                </div>
-                <button id="create-btn" class="tool-full-width">Create Artboard</button>
-            </div>
-
-            <hr>
-
-            <!-- Tools -->
-            <div class="tool-group">
-                <h4>Tools</h4>
-                <div class="tool-grid">
-                    <button class="tool-btn" id="select-tool" title="Select"><i class="bi bi-cursor"></i></button>
-                    <button class="tool-btn" id="rectangle-tool" title="Rectangle"><i class="bi bi-square"></i></button>
-                    <button class="tool-btn" id="circle-tool" title="Circle"><i class="bi bi-circle"></i></button>
-                    <button class="tool-btn" id="line-tool" title="Line"><i class="bi bi-slash-lg"></i></button>
-                    <button class="tool-btn" id="add-image-btn" title="Add Image"><i class="bi bi-image"></i></button>
-                    <button class="tool-btn" id="crop-tool" title="Crop"><i class="bi bi-crop"></i></button>
-                    <button class="tool-btn" id="eraser-tool" title="Eraser"><i class="bi bi-eraser"></i></button>
-                    <div class="tool-color-picker">
-                         <input type="color" id="color-picker" value="#000000" title="Color">
-                    </div>
-                </div>
-                 <input type="file" id="image-input" accept="image/*" style="display: none;">
-            </div>
-
-            <hr>
-
-            <!-- View Settings -->
-            <div class="tool-group">
-                <h4>View</h4>
-                <div class="tool tool-row-toggle">
-                    <label for="guide-grid-toggle">Guide Grid</label>
-                    <input type="checkbox" id="guide-grid-toggle" class="toggle-switch" checked>
+    <div id="toolbar">
+        <!-- Canvas Settings -->
+        <div class="tool-group">
+            <h4>Canvas</h4>
+            <div class="tool-row-compact">
+                <div class="tool tool-row">
+                    <label for="width-input">W</label>
+                    <input type="number" id="width-input" value="512" step="32" title="Width">
                 </div>
                 <div class="tool tool-row">
-                    <label for="guide-grid-color-picker">Color</label>
-                    <input type="color" id="guide-grid-color-picker" value="#000000">
-                </div>
-                <div class="tool tool-row-toggle">
-                    <label for="grid-toggle">Snap Grid</label>
-                    <input type="checkbox" id="grid-toggle" class="toggle-switch" checked>
-                </div>
-                <div class="tool tool-row">
-                    <label for="grid-color-picker">Color</label>
-                    <input type="color" id="grid-color-picker" value="#555555">
-                </div>
-                 <div class="tool tool-row-toggle">
-                    <label for="snap-toggle">Snap to Grid</label>
-                    <input type="checkbox" id="snap-toggle" class="toggle-switch" checked>
-                </div>
-                <div class="tool tool-row">
-                    <label for="snap-size-input">Size</label>
-                    <input type="number" id="snap-size-input" value="32" min="4">
+                    <label for="height-input">H</label>
+                    <input type="number" id="height-input" value="512" step="32" title="Height">
                 </div>
             </div>
-            
-            <hr>
-
-            <!-- Zoom -->
-            <div class="tool-group">
-                <div class="tool-group-header">
-                    <h4>Zoom</h4>
-                    <button id="reset-zoom-btn" title="Reset Zoom"><i class="bi bi-arrow-counterclockwise"></i></button>
-                </div>
-                <div class="tool">
-                    <input type="range" id="zoom-slider" min="10" max="3200" value="100">
-                </div>
-            </div>
+            <button id="create-btn" class="tool-full-width">Create Artboard</button>
         </div>
 
-        <div id="canvas-container">
-            <div id="viewport">
-                <canvas id="artboard"></canvas>
+        <hr>
+
+        <!-- Tools -->
+        <div class="tool-group">
+            <h4>Tools</h4>
+            <div class="tool-grid">
+                <button class="tool-btn" id="select-tool" title="Select"><i class="bi bi-cursor"></i></button>
+                <button class="tool-btn" id="rectangle-tool" title="Rectangle"><i class="bi bi-square"></i></button>
+                <button class="tool-btn" id="circle-tool" title="Circle"><i class="bi bi-circle"></i></button>
+                <button class="tool-btn" id="line-tool" title="Line"><i class="bi bi-slash-lg"></i></button>
+                <button class="tool-btn" id="add-image-btn" title="Add Image"><i class="bi bi-image"></i></button>
+                <button class="tool-btn" id="crop-tool" title="Crop"><i class="bi bi-crop"></i></button>
+                <button class="tool-btn" id="hand-tool" title="Hand Tool"><i class="bi bi-hand-index-thumb"></i></button>
+                <button class="tool-btn" id="eraser-tool" title="Eraser"><i class="bi bi-eraser"></i></button>
+                <div class="tool-color-picker">
+                     <input type="color" id="color-picker" value="#000000" title="Color">
+                </div>
             </div>
+             <input type="file" id="image-input" accept="image/*" style="display: none;">
+        </div>
+
+        <hr>
+
+        <!-- View Settings -->
+        <div class="tool-group">
+            <h4>View</h4>
+            <div class="tool tool-row-toggle">
+                <label for="guide-grid-toggle">Guide Grid</label>
+                <input type="checkbox" id="guide-grid-toggle" class="toggle-switch" checked>
+            </div>
+            <div class="tool tool-row">
+                <label for="guide-grid-color-picker">Color</label>
+                <input type="color" id="guide-grid-color-picker" value="#000000">
+            </div>
+            <div class="tool tool-row-toggle">
+                <label for="grid-toggle">Snap Grid</label>
+                <input type="checkbox" id="grid-toggle" class="toggle-switch" checked>
+            </div>
+            <div class="tool tool-row">
+                <label for="grid-color-picker">Color</label>
+                <input type="color" id="grid-color-picker" value="#555555">
+            </div>
+             <div class="tool tool-row-toggle">
+                <label for="snap-toggle">Snap to Grid</label>
+                <input type="checkbox" id="snap-toggle" class="toggle-switch" checked>
+            </div>
+            <div class="tool tool-row">
+                <label for="snap-size-input">Size</label>
+                <input type="number" id="snap-size-input" value="32" min="4">
+            </div>
+        </div>
+        
+        <hr>
+
+        <!-- Zoom -->
+        <div class="tool-group">
+            <div class="tool-group-header">
+                <h4>Zoom</h4>
+                <button id="reset-zoom-btn" title="Reset Zoom"><i class="bi bi-arrow-counterclockwise"></i></button>
+            </div>
+            <div class="tool">
+                <input type="range" id="zoom-slider" min="10" max="3200" value="100">
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="viewport">
+            <canvas id="artboard"></canvas>
         </div>
     </div>
 

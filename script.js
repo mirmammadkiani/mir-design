@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lineToolBtn = document.getElementById('line-tool');
     const selectToolBtn = document.getElementById('select-tool');
     const cropToolBtn = document.getElementById('crop-tool');
+    const handToolBtn = document.getElementById('hand-tool');
     const addImageBtn = document.getElementById('add-image-btn');
     const imageInput = document.getElementById('image-input');
 
@@ -121,8 +122,15 @@ document.addEventListener('DOMContentLoaded', () => {
         lineToolBtn.classList.toggle('active', tool === 'line');
         selectToolBtn.classList.toggle('active', tool === 'select');
         cropToolBtn.classList.toggle('active', tool === 'crop');
+        handToolBtn.classList.toggle('active', tool === 'hand');
         
-        canvas.style.cursor = (['rectangle', 'circle', 'line', 'eraser', 'crop'].includes(tool)) ? 'crosshair' : 'default';
+        if (tool === 'hand') {
+            canvas.style.cursor = 'grab';
+        } else if (['rectangle', 'circle', 'line', 'eraser', 'crop'].includes(tool)) {
+            canvas.style.cursor = 'crosshair';
+        } else {
+            canvas.style.cursor = 'default';
+        }
         
         selectionRect = null;
         selectedShapes = [];
@@ -329,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (index === activeLayerIndex) {
                 layerSummary.classList.add('active');
             }
+            layerSummary.dataset.index = index;
 
             const visibilityToggle = document.createElement('i');
             visibilityToggle.classList.add('bi', layer.isVisible ? 'bi-eye-fill' : 'bi-eye-slash-fill', 'layer-visibility');
@@ -494,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseDown(e) {
-        if (isSpacebarDown) {
+        if (isSpacebarDown || currentTool === 'hand') {
             isPanning = true;
             panStartPos.x = e.clientX;
             panStartPos.y = e.clientY;
@@ -670,6 +679,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseUp() {
+        if (isPanning) {
+            isPanning = false;
+            if (currentTool === 'hand') {
+                canvas.style.cursor = 'grab';
+            } else if (!isSpacebarDown) {
+                setCurrentTool(currentTool); // Reset to the tool's cursor
+            }
+            return;
+        }
+
         const activeLayer = layers[activeLayerIndex];
         if (!activeLayer) return;
 
@@ -793,6 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lineToolBtn.addEventListener('click', () => setCurrentTool('line'));
     selectToolBtn.addEventListener('click', () => setCurrentTool('select'));
     cropToolBtn.addEventListener('click', () => setCurrentTool('crop'));
+    handToolBtn.addEventListener('click', () => setCurrentTool('hand'));
     addImageBtn.addEventListener('click', () => imageInput.click());
 
     imageInput.addEventListener('change', (e) => {

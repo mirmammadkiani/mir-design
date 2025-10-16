@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('artboard');
     const canvasContainer = document.getElementById('canvas-container');
+    const viewport = document.getElementById('viewport');
     const ctx = canvas.getContext('2d');
 
     // UI Elements
@@ -25,10 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const lineToolBtn = document.getElementById('line-tool');
     const selectToolBtn = document.getElementById('select-tool');
     const cropToolBtn = document.getElementById('crop-tool');
+    const addImageBtn = document.getElementById('add-image-btn');
+    const imageInput = document.getElementById('image-input');
 
     // App State
     let artboardWidth = 0, artboardHeight = 0;
-    let isDrawing = false, isErasing = false, isSelecting = false, isMoving = false, isCropping = false;
+    let isDrawing = false, isErasing = false, isSelecting = false, isMoving = false, isCropping = false, isResizing = false, isPanning = false, isSpacebarDown = false;
+    let resizeHandle = null;
     let currentColor = colorPicker.value;
     let currentTool = 'rectangle';
     let isGridVisible = true;
@@ -41,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let startPos = null;
     let endPos = null;
     let moveStartPos = null;
+    let panStartPos = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
     
     let layers = [];
     let activeLayerIndex = -1;
@@ -91,6 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
         context.fill();
     }
 
+    function drawImage(context, shape) {
+        if (!shape.img || !shape.img.complete) return;
+        const x = Math.min(shape.x1, shape.x2);
+        const y = Math.min(shape.y1, shape.y2);
+        const width = Math.abs(shape.x1 - shape.x2);
+        const height = Math.abs(shape.y1 - shape.y2);
+        context.drawImage(shape.img, x, y, width, height);
+    }
+
     // --- Snap Logic ---
     function snap(value, gridSize) {
         if (!isSnapEnabled || gridSize <= 0) return value;
@@ -130,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         case 'circle': drawCircle(exportCtx, shape); break;
                         case 'line': drawLine(exportCtx, shape); break;
                         case 'polygon': drawPolygon(exportCtx, shape); break;
+                        case 'image': drawImage(exportCtx, shape); break;
                     }
                 });
             }
@@ -162,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         case 'circle': drawCircle(ctx, shape); break;
                         case 'line': drawLine(ctx, shape); break;
                         case 'polygon': drawPolygon(ctx, shape); break;
+                        case 'image': drawImage(ctx, shape); break;
                     }
                 });
             }
@@ -178,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'circle': drawCircle(ctx, previewShape); break;
                     case 'line': drawLine(ctx, previewShape); break;
                 }
-            } else if (isErasing) {
+            } else if (isErasing || isSelecting || isCropping) {
                 ctx.fillStyle = 'rgba(0, 123, 255, 0.25)';
                 ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
                 ctx.lineWidth = 1 / zoomLevel;
@@ -197,19 +213,48 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.setLineDash([4 / zoomLevel, 2 / zoomLevel]);
             ctx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.width, selectionRect.height);
             ctx.setLineDash([]);
-        } else if (isSelecting || isCropping) {
-            const x = Math.min(startPos.x, endPos.x);
-            const y = Math.min(startPos.y, endPos.y);
-            const width = Math.abs(startPos.x - endPos.x);
-            const height = Math.abs(startPos.y - endPos.y);
-            ctx.strokeStyle = isCropping ? 'rgba(255, 0, 0, 0.7)' : 'rgba(0, 123, 255, 0.8)';
+
+            const handles = getResizeHandles(selectionRect);
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
             ctx.lineWidth = 1 / zoomLevel;
-            ctx.setLineDash([4 / zoomLevel, 2 / zoomLevel]);
-            ctx.strokeRect(x, y, width, height);
-            ctx.setLineDash([]);
+            for (const key in handles) {
+                const handle = handles[key];
+                ctx.fillRect(handle.x, handle.y, handle.width, handle.height);
+                ctx.strokeRect(handle.x, handle.y, handle.width, handle.height);
+            }
+
         }
         
         ctx.restore();
+    }
+
+    function getResizeHandles(rect) {
+        const handleSize = 8 / zoomLevel;
+        const halfHandleSize = handleSize / 2;
+        return {
+            'top-left': { x: rect.x - halfHandleSize, y: rect.y - halfHandleSize, width: handleSize, height: handleSize },
+            'top-middle': { x: rect.x + rect.width / 2 - halfHandleSize, y: rect.y - halfHandleSize, width: handleSize, height: handleSize },
+            'top-right': { x: rect.x + rect.width - halfHandleSize, y: rect.y - halfHandleSize, width: handleSize, height: handleSize },
+            'middle-left': { x: rect.x - halfHandleSize, y: rect.y + rect.height / 2 - halfHandleSize, width: handleSize, height: handleSize },
+            'middle-right': { x: rect.x + rect.width - halfHandleSize, y: rect.y + rect.height / 2 - halfHandleSize, width: handleSize, height: handleSize },
+            'bottom-left': { x: rect.x - halfHandleSize, y: rect.y + rect.height - halfHandleSize, width: handleSize, height: handleSize },
+            'bottom-middle': { x: rect.x + rect.width / 2 - halfHandleSize, y: rect.y + rect.height - halfHandleSize, width: handleSize, height: handleSize },
+            'bottom-right': { x: rect.x + rect.width - halfHandleSize, y: rect.y + rect.height - halfHandleSize, width: handleSize, height: handleSize },
+        };
+    }
+
+    function getHandleAtPos(pos, rect) {
+        if (!rect) return null;
+        const handles = getResizeHandles(rect);
+        for (const key in handles) {
+            const handle = handles[key];
+            if (pos.x >= handle.x && pos.x <= handle.x + handle.width &&
+                pos.y >= handle.y && pos.y <= handle.y + handle.height) {
+                return key;
+            }
+        }
+        return null;
     }
 
     function drawCheckerboard(context, width, height) {
@@ -276,12 +321,53 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateLayerListUI() {
         layerList.innerHTML = '';
         layers.forEach((layer, index) => {
-            const layerItem = document.createElement('div');
-            layerItem.textContent = layer.name;
-            layerItem.classList.add('layer-item');
-            if (index === activeLayerIndex) layerItem.classList.add('active');
-            layerItem.addEventListener('click', () => setActiveLayer(index));
-            layerList.appendChild(layerItem);
+            const layerDetails = document.createElement('details');
+            layerDetails.open = true; // Keep layers expanded by default
+            
+            const layerSummary = document.createElement('summary');
+            layerSummary.classList.add('layer-item');
+            if (index === activeLayerIndex) {
+                layerSummary.classList.add('active');
+            }
+
+            const visibilityToggle = document.createElement('i');
+            visibilityToggle.classList.add('bi', layer.isVisible ? 'bi-eye-fill' : 'bi-eye-slash-fill', 'layer-visibility');
+            visibilityToggle.dataset.index = index;
+            
+            const layerName = document.createElement('span');
+            layerName.textContent = layer.name;
+            layerName.classList.add('layer-name');
+            layerName.dataset.index = index;
+
+            const deleteBtn = document.createElement('i');
+            deleteBtn.classList.add('bi', 'bi-trash-fill', 'delete-layer-btn');
+            deleteBtn.dataset.index = index;
+
+            layerSummary.appendChild(visibilityToggle);
+            layerSummary.appendChild(layerName);
+            layerSummary.appendChild(deleteBtn);
+            
+            layerDetails.appendChild(layerSummary);
+
+            const shapeList = document.createElement('div');
+            shapeList.classList.add('shape-list');
+            layer.shapes.slice().reverse().forEach((shape, i) => { // reverse to show newest on top
+                const shapeIndex = layer.shapes.length - 1 - i;
+                const shapeItem = document.createElement('div');
+                shapeItem.classList.add('shape-item');
+                
+                const shapeNameSpan = document.createElement('span');
+                shapeNameSpan.classList.add('shape-name');
+                shapeNameSpan.textContent = `└ ${shape.name || shape.type}`;
+                shapeNameSpan.dataset.layerIndex = index;
+                shapeNameSpan.dataset.shapeIndex = shapeIndex;
+
+                shapeItem.appendChild(shapeNameSpan);
+                shapeList.appendChild(shapeItem);
+            });
+            layerDetails.appendChild(shapeList);
+
+            layerList.appendChild(layerDetails);
         });
     }
 
@@ -303,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shape.type === 'polygon') {
             return shape.points;
         }
-        if (shape.type === 'rectangle') {
+        if (shape.type === 'rectangle' || shape.type === 'image') {
             const x1 = Math.min(shape.x1, shape.x2);
             const y1 = Math.min(shape.y1, shape.y2);
             const x2 = Math.max(shape.x1, shape.x2);
@@ -408,8 +494,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseDown(e) {
+        if (isSpacebarDown) {
+            isPanning = true;
+            panStartPos.x = e.clientX;
+            panStartPos.y = e.clientY;
+            panStartPos.scrollX = viewport.scrollLeft;
+            panStartPos.scrollY = viewport.scrollTop;
+            canvas.style.cursor = 'grabbing';
+            e.preventDefault();
+            return;
+        }
+
         let pos = getMousePos(e);
         if (currentTool === 'select') {
+            const handle = getHandleAtPos(pos, selectionRect);
+            if (handle) {
+                isResizing = true;
+                resizeHandle = handle;
+                moveStartPos = pos; // Use moveStartPos to track mouse movement
+                selectedShapes.forEach(shape => {
+                    if (shape.type === 'polygon') {
+                        shape.initialPoints = shape.points.map(p => ({...p}));
+                    } else {
+                        shape.initialX1 = shape.x1;
+                        shape.initialY1 = shape.y1;
+                        shape.initialX2 = shape.x2;
+                        shape.initialY2 = shape.y2;
+                    }
+                });
+                selectionRect.initial = { ...selectionRect };
+                return; // Stop further processing
+            }
+
             if (isPointInRect(pos, selectionRect)) {
                 isMoving = true;
                 moveStartPos = pos;
@@ -447,9 +563,91 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseMove(e) {
-        if (!isDrawing && !isErasing && !isSelecting && !isMoving && !isCropping) return;
+        if (isPanning) {
+            const dx = e.clientX - panStartPos.x;
+            const dy = e.clientY - panStartPos.y;
+            viewport.scrollLeft = panStartPos.scrollX - dx;
+            viewport.scrollTop = panStartPos.scrollY - dy;
+            return;
+        }
+
+        if (!isDrawing && !isErasing && !isSelecting && !isMoving && !isResizing && !isCropping) {
+            // --- Cursor Style Logic ---
+            if (currentTool === 'select' && selectionRect) {
+                const pos = getMousePos(e);
+                const handle = getHandleAtPos(pos, selectionRect);
+                if (handle) {
+                    if (handle.includes('top') && handle.includes('left')) canvas.style.cursor = 'nwse-resize';
+                    else if (handle.includes('top') && handle.includes('right')) canvas.style.cursor = 'nesw-resize';
+                    else if (handle.includes('bottom') && handle.includes('left')) canvas.style.cursor = 'nesw-resize';
+                    else if (handle.includes('bottom') && handle.includes('right')) canvas.style.cursor = 'nwse-resize';
+                    else if (handle.includes('top') || handle.includes('bottom')) canvas.style.cursor = 'ns-resize';
+                    else if (handle.includes('left') || handle.includes('right')) canvas.style.cursor = 'ew-resize';
+                } else if (isPointInRect(pos, selectionRect)) {
+                    canvas.style.cursor = 'move';
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            }
+            return;
+        }
+
         let pos = getMousePos(e);
-        if (isMoving) {
+
+        if (isResizing) {
+            const dx = pos.x - moveStartPos.x;
+            const dy = pos.y - moveStartPos.y;
+            const initial = selectionRect.initial;
+
+            let newX = initial.x;
+            let newY = initial.y;
+            let newWidth = initial.width;
+            let newHeight = initial.height;
+
+            if (resizeHandle.includes('right')) newWidth = initial.width + dx;
+            if (resizeHandle.includes('left')) {
+                newWidth = initial.width - dx;
+                newX = initial.x + dx;
+            }
+            if (resizeHandle.includes('bottom')) newHeight = initial.height + dy;
+            if (resizeHandle.includes('top')) {
+                newHeight = initial.height - dy;
+                newY = initial.y + dy;
+            }
+
+            // Prevent flipping
+            if (newWidth < 1) {
+                newWidth = 1;
+                newX = selectionRect.x;
+            }
+            if (newHeight < 1) {
+                newHeight = 1;
+                newY = selectionRect.y;
+            }
+
+            const scaleX = newWidth / initial.width;
+            const scaleY = newHeight / initial.height;
+
+            selectedShapes.forEach(shape => {
+                if (shape.type === 'polygon') {
+                    shape.points = shape.initialPoints.map(p => ({
+                        x: newX + (p.x - initial.x) * scaleX,
+                        y: newY + (p.y - initial.y) * scaleY
+                    }));
+                } else {
+                    shape.x1 = newX + (shape.initialX1 - initial.x) * scaleX;
+                    shape.y1 = newY + (shape.initialY1 - initial.y) * scaleY;
+                    shape.x2 = newX + (shape.initialX2 - initial.x) * scaleX;
+                    shape.y2 = newY + (shape.initialY2 - initial.y) * scaleY;
+                }
+            });
+
+            selectionRect.x = newX;
+            selectionRect.y = newY;
+            selectionRect.width = newWidth;
+            selectionRect.height = newHeight;
+
+        } else if (isMoving) {
             const dx = pos.x - moveStartPos.x;
             const dy = pos.y - moveStartPos.y;
             selectedShapes.forEach(shape => {
@@ -476,9 +674,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!activeLayer) return;
 
         if (isDrawing) {
-            activeLayer.shapes.push({ type: currentTool, color: currentColor, x1: startPos.x, y1: startPos.y, x2: endPos.x, y2: endPos.y });
+            const shapeName = currentTool.charAt(0).toUpperCase() + currentTool.slice(1);
+            activeLayer.shapes.push({ 
+                type: currentTool, 
+                name: shapeName,
+                color: currentColor, 
+                x1: startPos.x, y1: startPos.y, x2: endPos.x, y2: endPos.y 
+            });
+            updateLayerListUI();
         } else if (isErasing) {
             const eraseRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
+            const initialShapeCount = activeLayer.shapes.length;
             activeLayer.shapes = activeLayer.shapes.filter(shape => {
                 const shapePoly = shapeToPolygon(shape);
                 if (shapePoly.length === 0) return true;
@@ -486,6 +692,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const shapeX2 = Math.max(...shapePoly.map(p => p.x)), shapeY2 = Math.max(...shapePoly.map(p => p.y));
                 return !(shapeX1 < eraseRect.x + eraseRect.width && shapeX2 > eraseRect.x && shapeY1 < eraseRect.y + eraseRect.height && shapeY2 > eraseRect.y);
             });
+            if (initialShapeCount !== activeLayer.shapes.length) {
+                updateLayerListUI();
+            }
         } else if (isSelecting) {
             const userRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
             if (userRect.width > 0 || userRect.height > 0) findAndBoundSelectedShapes(userRect);
@@ -493,79 +702,83 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (isCropping) {
             const cropRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
             if (cropRect.width > 0 && cropRect.height > 0) {
-                const shapesToKeep = [];
-                const shapesToAdd = [];
-                const clipPoly = [{x: cropRect.x, y: cropRect.y}, {x: cropRect.x + cropRect.width, y: cropRect.y}, {x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height}, {x: cropRect.x, y: cropRect.y + cropRect.height}];
+                const newShapes = [];
+                const clipPoly = [
+                    {x: cropRect.x, y: cropRect.y}, 
+                    {x: cropRect.x + cropRect.width, y: cropRect.y}, 
+                    {x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height}, 
+                    {x: cropRect.x, y: cropRect.y + cropRect.height}
+                ];
                 
                 for (const shape of activeLayer.shapes) {
+                    if (shape.type === 'image') {
+                        const imgX = Math.min(shape.x1, shape.x2);
+                        const imgY = Math.min(shape.y1, shape.y2);
+                        const imgWidth = Math.abs(shape.x1 - shape.x2);
+                        const imgHeight = Math.abs(shape.y1 - shape.y2);
+
+                        // Find intersection
+                        const ix = Math.max(imgX, cropRect.x);
+                        const iy = Math.max(imgY, cropRect.y);
+                        const iWidth = Math.min(imgX + imgWidth, cropRect.x + cropRect.width) - ix;
+                        const iHeight = Math.min(imgY + imgHeight, cropRect.y + cropRect.height) - iy;
+
+                        if (iWidth > 0 && iHeight > 0) {
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = iWidth;
+                            tempCanvas.height = iHeight;
+                            const tempCtx = tempCanvas.getContext('2d');
+                            
+                            // sx, sy are the top-left coords of the source rect IN THE ORIGINAL IMAGE
+                            const sx = (ix - imgX);
+                            const sy = (iy - imgY);
+
+                            tempCtx.drawImage(shape.img, sx, sy, iWidth, iHeight, 0, 0, iWidth, iHeight);
+                            
+                            const newImg = new Image();
+                            newImg.onload = () => render(); // Re-render when the new cropped image is ready
+                            newImg.src = tempCanvas.toDataURL();
+
+                            newShapes.push({
+                                type: 'image',
+                                img: newImg,
+                                x1: ix,
+                                y1: iy,
+                                x2: ix + iWidth,
+                                y2: iy + iHeight
+                            });
+                        }
+                        continue; // Go to next shape
+                    }
+
                     const subjectPoly = shapeToPolygon(shape);
                     if (subjectPoly.length === 0) continue;
-                    const shapeX1 = Math.min(...subjectPoly.map(p => p.x)), shapeY1 = Math.min(...subjectPoly.map(p => p.y));
-                    const shapeX2 = Math.max(...subjectPoly.map(p => p.x)), shapeY2 = Math.max(...subjectPoly.map(p => p.y));
-                    
-                    if (shapeX2 < cropRect.x || shapeX1 > cropRect.x + cropRect.width || shapeY2 < cropRect.y || shapeY1 > cropRect.y + cropRect.height) {
-                        shapesToKeep.push(shape); // Keep shapes completely outside
-                    } else {
-                        if (shape.type === 'line') continue; // Remove intersecting lines for now
 
-                        if (shape.type === 'circle') {
-                            // High-fidelity circle clipping
-                            const radiusX = Math.abs(shape.x1 - shape.x2) / 2;
-                            const radiusY = Math.abs(shape.y1 - shape.y2) / 2;
-                            const centerX = Math.min(shape.x1, shape.x2) + radiusX;
-                            const centerY = Math.min(shape.y1, shape.y2) + radiusY;
+                    // Bounding box check for quick discard or inclusion
+                    const shapeX1 = Math.min(...subjectPoly.map(p => p.x));
+                    const shapeY1 = Math.min(...subjectPoly.map(p => p.y));
+                    const shapeX2 = Math.max(...subjectPoly.map(p => p.x));
+                    const shapeY2 =  Math.max(...subjectPoly.map(p => p.y));
+                    if (shapeX2 < cropRect.x || shapeX1 > cropRect.x + cropRect.width || shapeY2 < cropRect.y || shapeY1 > cropRect.y + cropRect.height) continue;
+                    if (shapeX1 >= cropRect.x && shapeX2 <= cropRect.x + cropRect.width && shapeY1 >= cropRect.y && shapeY2 <= cropRect.y + cropRect.height) {
+                        newShapes.push(shape);
+                        continue;
+                    }
 
-                            const finalPoints = [];
-                            // 1. Get high-res points from circle that are inside the rect
-                            for (const p of subjectPoly) {
-                                if (p.x >= cropRect.x && p.x <= cropRect.x + cropRect.width && p.y >= cropRect.y && p.y <= cropRect.y + cropRect.height) {
-                                    finalPoints.push(p);
-                                }
-                            }
+                    if (shape.type === 'line') continue;
 
-                            // 2. Get corners of rect that are inside the circle
-                            for (const p of clipPoly) {
-                                if (((p.x - centerX) ** 2) / (radiusX ** 2) + ((p.y - centerY) ** 2) / (radiusY ** 2) <= 1) {
-                                    finalPoints.push(p);
-                                }
-                            }
-                            
-                            // 3. Get intersection points
-                            const lines = [
-                                {p1: clipPoly[0], p2: clipPoly[1]}, {p1: clipPoly[1], p2: clipPoly[2]},
-                                {p1: clipPoly[2], p2: clipPoly[3]}, {p1: clipPoly[3], p2: clipPoly[0]}
-                            ];
-                            // (This is a simplified placeholder for a full line-ellipse intersection algorithm)
-                            // For now, we rely on the high-res points which gives a very good approximation.
-
-                            if (finalPoints.length > 2) {
-                                // 4. Sort points to form a convex hull
-                                let centroid = {x: 0, y: 0};
-                                finalPoints.forEach(p => { centroid.x += p.x; centroid.y += p.y; });
-                                centroid.x /= finalPoints.length;
-                                centroid.y /= finalPoints.length;
-
-                                finalPoints.sort((a, b) => {
-                                    const angleA = Math.atan2(a.y - centroid.y, a.x - centroid.x);
-                                    const angleB = Math.atan2(b.y - centroid.y, b.x - centroid.x);
-                                    return angleA - angleB;
-                                });
-                                shapesToAdd.push({ type: 'polygon', color: shape.color, points: finalPoints });
-                            }
-
-                        } else { // For rectangles and existing polygons
-                            const clippedPoints = clip(subjectPoly, clipPoly);
-                            if (clippedPoints.length > 2) {
-                                shapesToAdd.push({ type: 'polygon', color: shape.color, points: clippedPoints });
-                            }
-                        }
+                    const clippedPoints = clip(subjectPoly, clipPoly);
+                    if (clippedPoints.length > 2) {
+                        newShapes.push({ type: 'polygon', color: shape.color, points: clippedPoints });
                     }
                 }
-                activeLayer.shapes = [...shapesToKeep, ...shapesToAdd];
+                activeLayer.shapes = newShapes;
+                updateLayerListUI();
             }
         }
 
-        isDrawing = false; isErasing = false; isSelecting = false; isMoving = false; isCropping = false;
+        isDrawing = false; isErasing = false; isSelecting = false; isMoving = false; isCropping = false; isResizing = false;
+        resizeHandle = null;
         startPos = null; endPos = null; moveStartPos = null;
         render();
     }
@@ -580,6 +793,37 @@ document.addEventListener('DOMContentLoaded', () => {
     lineToolBtn.addEventListener('click', () => setCurrentTool('line'));
     selectToolBtn.addEventListener('click', () => setCurrentTool('select'));
     cropToolBtn.addEventListener('click', () => setCurrentTool('crop'));
+    addImageBtn.addEventListener('click', () => imageInput.click());
+
+    imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const activeLayer = layers[activeLayerIndex];
+                if (activeLayer) {
+                    const newImage = {
+                        type: 'image',
+                        name: 'Image',
+                        img: img,
+                        x1: 0,
+                        y1: 0,
+                        x2: img.width,
+                        y2: img.height
+                    };
+                    activeLayer.shapes.push(newImage);
+                    updateLayerListUI();
+                    render();
+                }
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = ''; // Reset input so same file can be loaded again
+    });
 
     gridToggle.addEventListener('change', (e) => { isGridVisible = e.target.checked; render(); });
     gridColorPicker.addEventListener('input', (e) => { gridColor = e.target.value; render(); });
@@ -601,8 +845,125 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    layerList.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.classList.contains('delete-layer-btn')) {
+            const index = parseInt(target.dataset.index, 10);
+            layers.splice(index, 1);
+            if (activeLayerIndex >= index) {
+                activeLayerIndex = Math.max(0, activeLayerIndex - 1);
+            }
+            if (layers.length === 0) {
+                addNewLayer();
+            }
+            updateLayerListUI();
+            render();
+        } else if (target.classList.contains('layer-visibility')) {
+            const index = parseInt(target.dataset.index, 10);
+            layers[index].isVisible = !layers[index].isVisible;
+            updateLayerListUI();
+            render();
+        } else if (target.closest('.layer-item')) {
+            const index = parseInt(target.closest('.layer-item').dataset.index, 10);
+            setActiveLayer(index);
+        }
+    });
+
+    layerList.addEventListener('dblclick', (e) => {
+        const target = e.target;
+
+        const createRenameInput = (element, onSave) => {
+            const currentName = element.textContent.replace('└ ', '').trim();
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.classList.add('layer-name-input');
+            
+            element.replaceWith(input);
+            input.focus();
+            input.select();
+
+            const save = () => {
+                const newName = input.value.trim();
+                onSave(newName || currentName); // Pass the new name to the callback
+                // The updateLayerListUI will redraw everything, so no need to replace input back
+            };
+
+            input.addEventListener('blur', save);
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') input.blur();
+                else if (ev.key === 'Escape') {
+                    input.value = currentName;
+                    input.blur();
+                }
+            });
+        };
+
+        if (target.classList.contains('layer-name')) {
+            const layerIndex = parseInt(target.dataset.index, 10);
+            createRenameInput(target, (newName) => {
+                layers[layerIndex].name = newName;
+                updateLayerListUI();
+            });
+        } else if (target.classList.contains('shape-name')) {
+            const layerIndex = parseInt(target.dataset.layerIndex, 10);
+            const shapeIndex = parseInt(target.dataset.shapeIndex, 10);
+            createRenameInput(target, (newName) => {
+                layers[layerIndex].shapes[shapeIndex].name = newName;
+                updateLayerListUI();
+            });
+        } else if (target.closest('.layer-item')) {
+            // Toggle the <details> element on dblclick of the summary
+            const details = target.closest('details');
+            if (details) {
+                details.open = !details.open;
+            }
+        }
+    });
+
     zoomSlider.addEventListener('input', applyZoom);
     resetZoomBtn.addEventListener('click', resetZoom);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === ' ' && !isSpacebarDown) {
+            isSpacebarDown = true;
+            if (!isDrawing && !isMoving && !isResizing) {
+                 canvas.style.cursor = 'grab';
+            }
+        }
+
+        if (['Delete', 'Backspace'].includes(e.key) && selectedShapes.length > 0) {
+            const activeLayer = layers[activeLayerIndex];
+            if (activeLayer) {
+                activeLayer.shapes = activeLayer.shapes.filter(shape => !selectedShapes.includes(shape));
+                selectedShapes = [];
+                selectionRect = null;
+                updateLayerListUI();
+                render();
+            }
+        }
+
+        if (e.key === 'Escape') {
+            if (isDrawing || isErasing || isSelecting || isCropping || isResizing || isMoving) {
+                isDrawing = isErasing = isSelecting = isCropping = isResizing = isMoving = false;
+                startPos = endPos = moveStartPos = resizeHandle = null;
+                render();
+            } else if (selectedShapes.length > 0) {
+                selectedShapes = [];
+                selectionRect = null;
+                render();
+            }
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.key === ' ') {
+            isSpacebarDown = false;
+            if (!isPanning) {
+                 setCurrentTool(currentTool); // Reset cursor
+            }
+        }
+    });
 
     // --- Initial Setup ---
     createArtboard();

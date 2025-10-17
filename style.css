@@ -129,91 +129,189 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 input[type="color"]::-moz-color-swatch { border: none; border-radius: 3px; }
 
 input:focus {
+
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+
+    border-color: #e67e22;
+
+    box-shadow: 0 0 0 2px rgba(230, 126, 34, 0.2);
+
 }
+
+
 
 button, .tool-btn {
+
     border: 1px solid #ccc;
+
     border-radius: 4px;
+
     background-color: #f8f8f8;
+
     cursor: pointer;
+
     transition: background-color 0.2s ease, border-color 0.2s ease;
+
 }
+
+
 
 button:hover, .tool-btn:hover {
+
     background-color: #e9e9e9;
+
     border-color: #aaa;
+
 }
+
+
 
 .tool-full-width {
+
     width: 100%;
+
     padding: 8px;
+
     font-size: 13px;
+
 }
+
+
 
 #create-btn, #export-btn {
-    background-color: #007bff;
+
+    background-color: #e67e22;
+
     color: white;
-    border-color: #007bff;
+
+    border-color: #e67e22;
+
     font-weight: 600;
+
 }
+
+
 
 #create-btn:hover, #export-btn:hover {
-    background-color: #0056b3;
-    border-color: #0056b3;
+
+    background-color: #d35400;
+
+    border-color: #d35400;
+
 }
+
+
 
 .tool-btn {
+
     width: 40px;
+
     height: 40px;
+
     font-size: 18px; /* Icon size */
+
     display: inline-flex;
+
     align-items: center;
+
     justify-content: center;
+
     padding: 0;
+
 }
+
+
 
 .tool-btn.active {
-    background-color: #dbeafe;
-    border-color: #93c5fd;
-    color: #007bff;
+
+    background-color: #fae5d3;
+
+    border-color: #f39c12;
+
+    color: #e67e22;
+
 }
+
+
+
+.panel-toggle-btn.active {
+
+    background-color: #fae5d3;
+
+    border-color: #f39c12;
+
+    color: #e67e22;
+
+}
+
+
 
 hr {
+
     border: none;
+
     border-top: 1px solid #e9ecef;
+
     margin: 15px 0;
+
 }
 
+
+
 /* Custom Toggle Switch */
+
 .toggle-switch {
+
     appearance: none;
+
     width: 38px;
+
     height: 22px;
+
     background-color: #ccc;
+
     border-radius: 11px;
+
     position: relative;
+
     cursor: pointer;
+
     transition: background-color 0.2s;
+
 }
+
 .toggle-switch::before {
+
     content: '';
+
     position: absolute;
+
     width: 18px;
+
     height: 18px;
+
     border-radius: 50%;
+
     background-color: white;
+
     top: 2px;
+
     left: 2px;
+
     transition: transform 0.2s;
+
 }
+
 .toggle-switch:checked {
-    background-color: #007bff;
+
+    background-color: #e67e22;
+
 }
+
 .toggle-switch:checked::before {
+
     transform: translateX(16px);
+
 }
 
 
@@ -241,6 +339,31 @@ hr {
     cursor: crosshair;
     margin: auto; /* This will center the artboard in the flex container */
     flex-shrink: 0; /* Prevent shrinking */
+}
+
+#popup-panel {
+    position: absolute;
+    top: 0;
+    left: 220px; /* Toolbar width */
+    width: 240px;
+    background-color: #ffffff;
+    border-right: 1px solid #d9d9d9;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 100;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.popup-content h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #495057;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.popup-content button {
+    margin-bottom: 10px;
 }
 
 /* Right Panel */
@@ -283,9 +406,9 @@ summary.layer-item:hover {
 }
 
 summary.layer-item.active {
-    background-color: #e7f5ff;
+    background-color: #fae5d3;
     font-weight: 600;
-    color: #007bff;
+    color: #e67e22;
 }
 
 .layer-actions {
@@ -313,7 +436,7 @@ summary.layer-item.active {
 
 .layer-item.active {
 
-    background-color: #e7f5ff;
+    background-color: #fae5d3;
 
 }
 
@@ -399,7 +522,7 @@ summary.layer-item.active {
 
     box-sizing: border-box;
 
-    border: 1px solid #007bff;
+    border: 1px solid #e67e22;
 
     border-radius: 3px;
 
@@ -467,19 +590,13 @@ summary.layer-item.active {
 
     
 
-    
-
             background-color: #e9ecef;
 
     
 
     
 
-    
-
             color: #333;
-
-    
 
     
 
@@ -517,7 +634,7 @@ summary.layer-item.active {
 
     
 
-        background-color: #007bff;
+        background-color: #e67e22;
 
     
 
@@ -564,7 +681,7 @@ summary.layer-item.active {
 }
 
 .history-item.active {
-    background-color: #e7f5ff;
+    background-color: #fae5d3;
     font-weight: 600;
-    color: #007bff;
+    color: #e67e22;
 }

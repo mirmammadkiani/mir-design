@@ -15,11 +15,11 @@
             <div class="tool-row-compact">
                 <div class="tool tool-row">
                     <label for="width-input">W</label>
-                    <input type="number" id="width-input" value="512" step="32" title="Width">
+                    <input type="number" id="width-input" value="128" step="32" title="Width">
                 </div>
                 <div class="tool tool-row">
                     <label for="height-input">H</label>
-                    <input type="number" id="height-input" value="512" step="32" title="Height">
+                    <input type="number" id="height-input" value="128" step="32" title="Height">
                 </div>
             </div>
             <button id="create-btn" class="tool-full-width">Create Artboard</button>
@@ -50,7 +50,7 @@
 
         <!-- View Settings -->
         <div class="tool-group">
-            <h4>View</h4>
+            <h4>Grid</h4>
             <div class="tool tool-row-toggle">
                 <label for="guide-grid-toggle">Guide Grid</label>
                 <input type="checkbox" id="guide-grid-toggle" class="toggle-switch" checked>
@@ -108,15 +108,15 @@
                 <button id="delete-layer-btn" title="Delete Layer"><i class="bi bi-trash-fill"></i></button>
             </div>
         </div>
-        <div id="export-panel" class="panel">
-            <h3>Export</h3>
-            <button id="export-btn">Export as PNG</button>
-        </div>
         <div id="history-panel" class="panel">
             <h3>History</h3>
             <div id="history-list">
                 <!-- History items will be added here -->
             </div>
+        </div>
+        <div id="export-panel" class="panel">
+            <h3>Export</h3>
+            <button id="export-btn">Export as PNG</button>
         </div>
     </div>
 

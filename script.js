@@ -380,8 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function createArtboard() {
         let rawWidth = parseInt(widthInput.value, 10);
         let rawHeight = parseInt(heightInput.value, 10);
-        if (isNaN(rawWidth) || rawWidth <= 0) rawWidth = 512;
-        if (isNaN(rawHeight) || rawHeight <= 0) rawHeight = 512;
+        if (isNaN(rawWidth) || rawWidth <= 0) rawWidth = 128;
+        if (isNaN(rawHeight) || rawHeight <= 0) rawHeight = 128;
         artboardWidth = Math.round(rawWidth / 32) * 32;
         artboardHeight = Math.round(rawHeight / 32) * 32;
         if (artboardWidth < 32) artboardWidth = 32;
@@ -474,8 +474,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetZoom() {
-        zoomLevel = 1;
-        zoomSlider.value = 100;
+        const viewportWidth = viewport.offsetWidth - 40; // Subtract padding
+        const viewportHeight = viewport.offsetHeight - 40; // Subtract padding
+
+        const scaleX = viewportWidth / artboardWidth;
+        const scaleY = viewportHeight / artboardHeight;
+
+        zoomLevel = Math.min(scaleX, scaleY); // Fit to screen, allowing zoom in beyond 100%
+        if (zoomLevel < 0.1) zoomLevel = 0.1; // Minimum zoom
+        if (zoomLevel > 32) zoomLevel = 32; // Maximum zoom (3200% / 100)
+
+        zoomSlider.value = zoomLevel * 100;
         render();
     }
 
@@ -841,85 +850,125 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userRect.width > 0 || userRect.height > 0) findAndBoundSelectedShapes(userRect);
             else { selectionRect = null; selectedShapes = []; }
         } else if (isCropping) {
-            const cropRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
+            const cropRect = {
+                x: Math.min(startPos.x, endPos.x),
+                y: Math.min(startPos.y, endPos.y),
+                width: Math.abs(startPos.x - endPos.x),
+                height: Math.abs(startPos.y - endPos.y)
+            };
+
             if (cropRect.width > 0 && cropRect.height > 0) {
-                const originalShapesJSON = JSON.stringify(activeLayer.shapes);
+                // Clamp cropRect to be within the artboard
+                cropRect.x = Math.max(0, cropRect.x);
+                cropRect.y = Math.max(0, cropRect.y);
+                cropRect.width = Math.min(artboardWidth - cropRect.x, cropRect.width);
+                cropRect.height = Math.min(artboardHeight - cropRect.y, cropRect.height);
+
                 const newShapes = [];
                 const clipPoly = [
-                    {x: cropRect.x, y: cropRect.y}, 
-                    {x: cropRect.x + cropRect.width, y: cropRect.y}, 
-                    {x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height}, 
+                    {x: cropRect.x, y: cropRect.y},
+                    {x: cropRect.x + cropRect.width, y: cropRect.y},
+                    {x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height},
                     {x: cropRect.x, y: cropRect.y + cropRect.height}
                 ];
-                
-                for (const shape of activeLayer.shapes) {
-                    if (shape.type === 'image') {
-                        const imgX = Math.min(shape.x1, shape.x2);
-                        const imgY = Math.min(shape.y1, shape.y2);
-                        const imgWidth = Math.abs(shape.x1 - shape.x2);
-                        const imgHeight = Math.abs(shape.y1 - shape.y2);
 
-                        // Find intersection
-                        const ix = Math.max(imgX, cropRect.x);
-                        const iy = Math.max(imgY, cropRect.y);
-                        const iWidth = Math.min(imgX + imgWidth, cropRect.x + cropRect.width) - ix;
-                        const iHeight = Math.min(imgY + imgHeight, cropRect.y + cropRect.height) - iy;
+                for (const layer of layers) {
+                    const croppedShapes = [];
+                    for (const shape of layer.shapes) {
+                        const subjectPoly = shapeToPolygon(shape);
+                        if (subjectPoly.length === 0) continue;
 
-                        if (iWidth > 0 && iHeight > 0) {
-                            const tempCanvas = document.createElement('canvas');
-                            tempCanvas.width = iWidth;
-                            tempCanvas.height = iHeight;
-                            const tempCtx = tempCanvas.getContext('2d');
-                            
-                            const sx = (ix - imgX);
-                            const sy = (iy - imgY);
-
-                            tempCtx.drawImage(shape.img, sx, sy, iWidth, iHeight, 0, 0, iWidth, iHeight);
-                            
-                            const newImg = new Image();
-                            newImg.onload = () => render();
-                            newImg.src = tempCanvas.toDataURL();
-
-                            newShapes.push({
-                                id: Date.now() + Math.random(),
-                                type: 'image',
-                                img: newImg,
-                                x1: ix,
-                                y1: iy,
-                                x2: ix + iWidth,
-                                y2: iy + iHeight,
-                                isVisible: shape.isVisible
-                            });
+                        // Bounding box check for quick discard
+                        const shapeX1 = Math.min(...subjectPoly.map(p => p.x));
+                        const shapeY1 = Math.min(...subjectPoly.map(p => p.y));
+                        const shapeX2 = Math.max(...subjectPoly.map(p => p.x));
+                        const shapeY2 = Math.max(...subjectPoly.map(p => p.y));
+                        if (shapeX2 < cropRect.x || shapeX1 > cropRect.x + cropRect.width ||
+                            shapeY2 < cropRect.y || shapeY1 > cropRect.y + cropRect.height) {
+                            continue; // Shape is completely outside the crop area
                         }
-                        continue;
+
+                        // If shape is completely inside, just offset it
+                        if (shapeX1 >= cropRect.x && shapeX2 <= cropRect.x + cropRect.width &&
+                            shapeY1 >= cropRect.y && shapeY2 <= cropRect.y + cropRect.height) {
+                            const newShape = JSON.parse(JSON.stringify(shape));
+                            if (newShape.type === 'polygon') {
+                                newShape.points.forEach(p => {
+                                    // p.x -= cropRect.x;
+                                    // p.y -= cropRect.y;
+                                });
+                            } else {
+                                // newShape.x1 -= cropRect.x;
+                                // newShape.y1 -= cropRect.y;
+                                // newShape.x2 -= cropRect.x;
+                                // newShape.y2 -= cropRect.y;
+                            }
+                            croppedShapes.push(newShape);
+                            continue;
+                        }
+                        
+                        // Handle images with a specialized, simpler clipping method
+                        if (shape.type === 'image') {
+                            const imgX = Math.min(shape.x1, shape.x2);
+                            const imgY = Math.min(shape.y1, shape.y2);
+                            const imgWidth = Math.abs(shape.x1 - shape.x2);
+                            const imgHeight = Math.abs(shape.y1 - shape.y2);
+
+                            const intersectX = Math.max(imgX, cropRect.x);
+                            const intersectY = Math.max(imgY, cropRect.y);
+                            const intersectWidth = Math.min(imgX + imgWidth, cropRect.x + cropRect.width) - intersectX;
+                            const intersectHeight = Math.min(imgY + imgHeight, cropRect.y + cropRect.height) - intersectY;
+
+                            if (intersectWidth > 0 && intersectHeight > 0) {
+                                const tempCanvas = document.createElement('canvas');
+                                tempCanvas.width = intersectWidth;
+                                tempCanvas.height = intersectHeight;
+                                const tempCtx = tempCanvas.getContext('2d');
+
+                                const sourceXInImage = (intersectX - imgX);
+                                const sourceYInImage = (intersectY - imgY);
+
+                                tempCtx.drawImage(shape.img, sourceXInImage, sourceYInImage, intersectWidth, intersectHeight, 0, 0, intersectWidth, intersectHeight);
+                                
+                                const newImg = new Image();
+                                newImg.src = tempCanvas.toDataURL();
+                                // onload is not strictly needed if we don't re-render immediately,
+                                // but good practice if we did.
+                                
+                                croppedShapes.push({
+                                    ...shape,
+                                    id: Date.now() + Math.random(),
+                                    img: newImg,
+                                    x1: intersectX,
+                                    y1: intersectY,
+                                    x2: intersectX + intersectWidth,
+                                    y2: intersectY + intersectHeight,
+                                });
+                            }
+                            continue; // Move to next shape
+                        }
+
+
+                        // For other vector shapes, use the clipping algorithm
+                        const clippedPoints = clip(subjectPoly, clipPoly);
+                        if (clippedPoints.length > 2) {
+                            const newShape = {
+                                ...shape,
+                                id: Date.now() + Math.random(),
+                                type: 'polygon',
+                                points: clippedPoints.map(p => ({
+                                    x: p.x,
+                                    y: p.y
+                                }))
+                            };
+                            croppedShapes.push(newShape);
+                        }
                     }
-
-                    const subjectPoly = shapeToPolygon(shape);
-                    if (subjectPoly.length === 0) continue;
-
-                    const shapeX1 = Math.min(...subjectPoly.map(p => p.x));
-                    const shapeY1 = Math.min(...subjectPoly.map(p => p.y));
-                    const shapeX2 = Math.max(...subjectPoly.map(p => p.x));
-                    const shapeY2 =  Math.max(...subjectPoly.map(p => p.y));
-                    if (shapeX2 < cropRect.x || shapeX1 > cropRect.x + cropRect.width || shapeY2 < cropRect.y || shapeY1 > cropRect.y + cropRect.height) continue;
-                    if (shapeX1 >= cropRect.x && shapeX2 <= cropRect.x + cropRect.width && shapeY1 >= cropRect.y && shapeY2 <= cropRect.y + cropRect.height) {
-                        newShapes.push(shape);
-                        continue;
-                    }
-
-                    if (shape.type === 'line') continue;
-
-                    const clippedPoints = clip(subjectPoly, clipPoly);
-                    if (clippedPoints.length > 2) {
-                        newShapes.push({ id: Date.now() + Math.random(), type: 'polygon', color: shape.color, points: clippedPoints, isVisible: shape.isVisible });
-                    }
+                    layer.shapes = croppedShapes;
                 }
 
-                if (JSON.stringify(newShapes) !== originalShapesJSON) {
-                    saveState('Crop');
-                    activeLayer.shapes = newShapes;
-                    updateLayerListUI();
-                }
+                saveState('Crop Content');
+                updateLayerListUI();
             }
         } else if (isMoving || isResizing) {
             saveState(isMoving ? 'Move Shape' : 'Resize Shape');

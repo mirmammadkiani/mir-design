@@ -21,14 +21,25 @@ body {
     overflow-y: auto;
     box-sizing: border-box;
 }
-.tool-group h4 {
-    margin-top: 0;
-    margin-bottom: 12px;
-    color: #555;
+
+#toolbar h4 {
+    color: #495057;
     font-size: 14px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+.tool-group {
+    /* margin-bottom removed, hr will handle spacing */
+}
+
+.tool-group h4 {
+    /* These properties are now covered by #toolbar h4, no need to repeat */
+    /* margin-top: 0; */
+    /* margin-bottom: 12px; */
 }
 
 .tool {
@@ -50,8 +61,8 @@ body {
 }
 
 .tool-row label {
-    font-size: 13px;
-    color: #666;
+    font-size: 13px; /* Standardize body text size */
+    color: #555; /* Standardize body text color */
     margin-right: 10px;
     flex-basis: 20%;
 }
@@ -152,7 +163,7 @@ button, .tool-btn {
 
     border-radius: 4px;
 
-    background-color: #f8f8f8;
+    background-color: #ffffff; /* Changed to white */
 
     cursor: pointer;
 
@@ -164,9 +175,11 @@ button, .tool-btn {
 
 button:hover, .tool-btn:hover {
 
-    background-color: #e9e9e9;
+    background-color: #e67e22; /* Changed to orange */
 
-    border-color: #aaa;
+    color: white; /* Ensure text is white on orange hover */
+
+    border-color: #e67e22; /* Match border to background on hover */
 
 }
 
@@ -182,29 +195,25 @@ button:hover, .tool-btn:hover {
 
 }
 
+.top-toolbar-buttons {
+    display: flex;
+    justify-content: space-around; /* Distribute space evenly */
+    gap: 5px; /* Space between buttons */
+    margin-bottom: 15px; /* Space below the button group */
+}
 
-
-#create-btn, #export-btn {
-
-    background-color: #e67e22;
-
-    color: white;
-
-    border-color: #e67e22;
-
-    font-weight: 600;
-
+.top-toolbar-buttons button {
+    flex-grow: 1; /* Allow buttons to grow and fill space */
+    padding: 8px 5px; /* Adjust padding for icon-only buttons */
+    font-size: 18px; /* Icon size */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 
 
-#create-btn:hover, #export-btn:hover {
 
-    background-color: #d35400;
-
-    border-color: #d35400;
-
-}
 
 
 
@@ -254,11 +263,19 @@ button:hover, .tool-btn:hover {
 
 hr {
 
+
+
     border: none;
+
+
 
     border-top: 1px solid #e9ecef;
 
-    margin: 15px 0;
+
+
+    margin: 20px 0; /* Increased margin for clearer separation */
+
+
 
 }
 
@@ -374,7 +391,6 @@ hr {
 
 /* Right Panel */
 #right-panel {
-    /* position: fixed; REMOVED for flexbox layout */
     height: 100vh;
     width: 240px;
     padding: 20px;
@@ -385,12 +401,24 @@ hr {
     flex-shrink: 0; /* Prevent panel from shrinking */
 }
 
+#layers-panel,
+#history-panel,
+#grid-tool-group {
+    display: block; /* Ensure these panels are visible by default */
+}
+
 .panel h3 {
     margin-top: 0;
     margin-bottom: 15px;
-    color: #495057;
+    color: #495057; /* Keep original color for contrast */
+    font-size: 16px; /* Standardize h3 size */
+    font-weight: 600; /* Standardize h3 weight */
     border-bottom: 1px solid #e9ecef;
     padding-bottom: 10px;
+}
+
+#history-panel h3 {
+    border-bottom: none; /* Remove the line below the History title */
 }
 
 /* Layers Panel */
@@ -679,7 +707,8 @@ summary.layer-item.active {
     padding: 8px 12px;
     border-bottom: 1px solid #e9ecef;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 13px; /* Standardize body text size */
+    color: #555; /* Standardize body text color */
 }
 
 .history-item:hover {
@@ -697,9 +726,10 @@ summary.layer-item.active {
     position: absolute;
     top: 0;
     left: 220px; /* Toolbar width */
-    width: 240px;
+    width: 240px; /* Reverted to original width */
+    /* height: 100%; Removed */
     background-color: #ffffff;
-    border-right: 1px solid #d9d9d9;
+    border-right: 1px solid #d9d9d9; /* Re-added border */
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     z-index: 100;
     padding: 20px;
@@ -708,6 +738,21 @@ summary.layer-item.active {
 }
 
 #view-popup-panel {
+    position: absolute;
+    top: 0;
+    left: 220px; /* Toolbar width */
+    width: 240px; /* Reverted to original width */
+    /* height: 100%; Removed */
+    background-color: #ffffff;
+    border-right: 1px solid #d9d9d9; /* Re-added border */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 100;
+    padding: 20px;
+    box-sizing: border-box;
+    display: none; /* Hidden by default */
+}
+
+#about-popup-panel {
     position: absolute;
     top: 0;
     left: 220px; /* Toolbar width */
@@ -724,7 +769,9 @@ summary.layer-item.active {
 .popup-panel h3 {
     margin-top: 0;
     margin-bottom: 15px;
-    color: #888; /* Even lighter gray for headers */
+    color: #495057; /* Use consistent color as .panel h3 */
+    font-size: 16px; /* Standardize h3 size */
+    font-weight: 600; /* Standardize h3 weight */
     border-bottom: 1px solid #e9ecef;
     padding-bottom: 10px;
 }
@@ -732,8 +779,8 @@ summary.layer-item.active {
 .popup-panel p,
 .popup-panel label {
     margin-bottom: 10px;
-    font-size: 14px;
-    color: #555;
+    font-size: 13px; /* Standardize body text size */
+    color: #555; /* Standardize body text color */
 }
 
 .popup-panel span {

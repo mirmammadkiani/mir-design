@@ -9,26 +9,15 @@
 </head>
 <body>
     <div id="toolbar">
-        <button id="file-btn" class="tool-full-width" title="File"><i class="bi bi-file-earmark"></i> File</button>
-        <button id="view-btn" class="tool-full-width" title="View"><i class="bi bi-eye"></i> View</button>
-        <!-- Canvas Settings -->
-        <div class="tool-group">
-            <h4>Canvas</h4>
-            <div class="tool-row-compact">
-                <div class="tool tool-row">
-                    <label for="width-input">W</label>
-                    <input type="number" id="width-input" value="128" step="32" title="Width">
-                </div>
-                <div class="tool tool-row">
-                    <label for="height-input">H</label>
-                    <input type="number" id="height-input" value="128" step="32" title="Height">
-                </div>
+        <div class="panel-section">
+            <h4>Panels</h4>
+            <div class="top-toolbar-buttons">
+                <button id="file-btn" title="File"><i class="bi bi-file-earmark"></i></button>
+                <button id="view-btn" title="View"><i class="bi bi-eye"></i></button>
+                <button id="about-btn" title="About"><i class="bi bi-info-circle"></i></button>
             </div>
-            <button id="create-btn" class="tool-full-width">Create Artboard</button>
         </div>
-
-        <hr>
-
+        <hr> <!-- This hr is now between the "Panels" section and "Canvas" section -->
         <!-- Tools -->
         <div class="tool-group">
             <h4>Tools</h4>
@@ -48,10 +37,10 @@
              <input type="file" id="image-input" accept="image/*" style="display: none;">
         </div>
 
-        <hr>
+        <hr id="grid-panel-separator"> <!-- Added ID -->
 
         <!-- View Settings -->
-        <div class="tool-group">
+        <div id="grid-tool-group" class="tool-group"> <!-- Added ID -->
             <h4>Grid</h4>
             <div class="tool tool-row-toggle">
                 <label for="guide-grid-toggle">Guide Grid</label>
@@ -59,7 +48,7 @@
             </div>
             <div class="tool tool-row">
                 <label for="guide-grid-color-picker">Color</label>
-                <input type="color" id="guide-grid-color-picker" value="#000000">
+                <input type="color" id="guide-grid-color-picker" value="#d35400"> <!-- Darker Orange for Guide Grid -->
             </div>
             <div class="tool tool-row-toggle">
                 <label for="grid-toggle">Snap Grid</label>
@@ -67,7 +56,7 @@
             </div>
             <div class="tool tool-row">
                 <label for="grid-color-picker">Color</label>
-                <input type="color" id="grid-color-picker" value="#555555">
+                <input type="color" id="grid-color-picker" value="#e67e22"> <!-- Darker Orange for Snap Grid -->
             </div>
              <div class="tool tool-row-toggle">
                 <label for="snap-toggle">Snap to Grid</label>
@@ -75,7 +64,7 @@
             </div>
             <div class="tool tool-row">
                 <label for="snap-size-input">Size</label>
-                <input type="number" id="snap-size-input" value="32" min="4">
+                <input type="number" id="snap-size-input" value="4" min="4">
             </div>
         </div>
         
@@ -110,26 +99,42 @@
                 <button id="delete-layer-btn" title="Delete Layer"><i class="bi bi-trash-fill"></i></button>
             </div>
         </div>
+        <hr> <!-- Moved hr here -->
         <div id="history-panel" class="panel">
             <h3>History</h3>
             <div id="history-list">
                 <!-- History items will be added here -->
             </div>
         </div>
-        <div id="export-panel" class="panel">
-            <h3>Export</h3>
-            <button id="export-btn">Export as PNG</button>
-        </div>
-    </div>
+        </div> <!-- Closing div for #right-panel -->
 
     <div id="file-popup-panel" class="popup-panel">
         <h3>Canvas Information</h3>
         <p>Width: <span id="canvas-info-width"></span> px</p>
         <p>Height: <span id="canvas-info-height"></span> px</p>
         <p>Zoom Level: <span id="canvas-info-zoom"></span>%</p>
+
+        <hr> <!-- Add a separator -->
+
+        <h3>Create New Artboard</h3>
+        <div class="tool-row-compact">
+            <div class="tool tool-row">
+                <label for="width-input">W</label>
+                <input type="number" id="width-input" value="128" step="32" title="Width">
+            </div>
+            <div class="tool tool-row">
+                <label for="height-input">H</label>
+                <input type="number" id="height-input" value="128" step="32" title="Height">
+            </div>
+        </div>
+        <button id="create-btn" class="tool-full-width">Create Artboard</button>
+
+        <hr> <!-- Add another separator -->
+
         <button id="save-project-btn" class="tool-full-width">Save Project</button>
         <input type="file" id="load-project-input" accept=".json" style="display: none;">
         <button id="load-project-btn" class="tool-full-width">Load Project</button>
+        <button id="export-btn" class="tool-full-width">Export as PNG</button>
         <button id="close-file-popup-btn" class="tool-full-width">Close</button>
     </div>
 
@@ -143,7 +148,20 @@
             <label for="toggle-history-panel">History Panel</label>
             <input type="checkbox" id="toggle-history-panel" class="toggle-switch" checked>
         </div>
+        <div class="tool tool-row-toggle">
+            <label for="toggle-grid-panel">Grid Panel</label>
+            <input type="checkbox" id="toggle-grid-panel" class="toggle-switch" checked>
+        </div>
         <button id="close-view-popup-btn" class="tool-full-width">Close</button>
+    </div>
+
+    <div id="about-popup-panel" class="popup-panel">
+        <h3>About Pixel Art Editor</h3>
+        <p>Software for everyone</p> <!-- Moved and changed to English -->
+        <p>Version: 0.5</p>
+        <p>Developed by: mirMammad</p> <!-- Changed name -->
+        <p>This is a simple pixel art editor built with HTML, CSS, and JavaScript.</p>
+        <button id="close-about-popup-btn" class="tool-full-width">Close</button>
     </div>
 
     <script src="script.js"></script>

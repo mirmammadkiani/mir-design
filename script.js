@@ -32,6 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const addImageBtn = document.getElementById('add-image-btn');
     const imageInput = document.getElementById('image-input');
 
+    // About Popup Elements
+    const aboutBtn = document.getElementById('about-btn');
+    const aboutPopupPanel = document.getElementById('about-popup-panel');
+    const closeAboutPopupBtn = document.getElementById('close-about-popup-btn');
+
     // File Popup Elements
     const fileBtn = document.getElementById('file-btn');
     const filePopupPanel = document.getElementById('file-popup-panel');
@@ -49,8 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeViewPopupBtn = document.getElementById('close-view-popup-btn');
     const toggleLayersPanel = document.getElementById('toggle-layers-panel');
     const toggleHistoryPanel = document.getElementById('toggle-history-panel');
+    const toggleGridPanel = document.getElementById('toggle-grid-panel'); // New reference
     const layersPanel = document.getElementById('layers-panel');
     const historyPanel = document.getElementById('history-panel');
+    const gridPanel = document.getElementById('grid-tool-group'); // Reference to the Grid tool-group
+    const gridPanelSeparator = document.getElementById('grid-panel-separator'); // New reference
 
     // App State
     let artboardWidth = 0, artboardHeight = 0;
@@ -63,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isGuideGridVisible = true;
     let guideGridColor = guideGridColorPicker.value;
     let isSnapEnabled = true;
-    let snapGridSize = 32;
+    let snapGridSize = 4; // Changed default snap grid size to 4
     let zoomLevel = 1;
     let startPos = null;
     let endPos = null;
@@ -519,6 +527,10 @@ document.addEventListener('DOMContentLoaded', () => {
         history = [];
         historyIndex = -1;
         saveState('Initial State');
+        if (gridPanel) { // Ensure grid panel is visible on artboard creation
+            gridPanel.style.display = 'block';
+            toggleGridPanel.checked = true;
+        }
     }
 
     function addNewLayer() {
@@ -1098,66 +1110,32 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (cropRect.width > 0 && cropRect.height > 0) {
-                // Clamp cropRect to be within the artboard - REMOVED, cropRect should be what user drew
-                // cropRect.x = Math.max(0, cropRect.x);
-                // cropRect.y = Math.max(0, cropRect.y);
-                // cropRect.width = Math.min(artboardWidth - cropRect.x, cropRect.width);
-                // cropRect.height = Math.min(artboardHeight - cropRect.y, cropRect.height);
+                const newShapesInActiveLayer = [];
+                const activeLayerShapes = layers[activeLayerIndex].shapes;
 
-                const newShapes = [];
-                const clipPoly = [
-                    {x: cropRect.x, y: cropRect.y},
-                    {x: cropRect.x + cropRect.width, y: cropRect.y},
-                    {x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height},
-                    {x: cropRect.x, y: cropRect.y + cropRect.height}
-                ];
+                for (const shape of activeLayerShapes) {
+                    // Bounding box check for quick discard
+                    const shapePoly = shapeToPolygon(shape);
+                    if (shapePoly.length === 0) continue; // Skip empty shapes
 
-                for (const layer of layers) {
-                    const croppedShapes = [];
-                    for (const shape of layer.shapes) {
-                        const subjectPoly = shapeToPolygon(shape);
-                        if (subjectPoly.length === 0) continue;
+                    const shapeX1 = Math.min(...shapePoly.map(p => p.x));
+                    const shapeY1 = Math.min(...shapePoly.map(p => p.y));
+                    const shapeX2 = Math.max(...shapePoly.map(p => p.x));
+                    const shapeY2 = Math.max(...shapePoly.map(p => p.y));
 
-                        // Bounding box check for quick discard
-                        const shapeX1 = Math.min(...subjectPoly.map(p => p.x));
-                        const shapeY1 = Math.min(...subjectPoly.map(p => p.y));
-                        const shapeX2 = Math.max(...subjectPoly.map(p => p.x));
-                        const shapeY2 = Math.max(...subjectPoly.map(p => p.y));
-                        if (shapeX2 < cropRect.x || shapeX1 > cropRect.x + cropRect.width ||
-                            shapeY2 < cropRect.y || shapeY1 > cropRect.y + cropRect.height) {
-                            continue; // Shape is completely outside the crop area
-                        }
+                    // Check if shape intersects with the cropRect
+                    if (!(shapeX2 < cropRect.x || shapeX1 > cropRect.x + cropRect.width ||
+                          shapeY2 < cropRect.y || shapeY1 > cropRect.y + cropRect.height)) {
 
-                        // If shape is completely inside, just offset it
-                        if (shapeX1 >= cropRect.x && shapeX2 <= cropRect.x + cropRect.width &&
-                            shapeY1 >= cropRect.y && shapeY2 <= cropRect.y + cropRect.height) {
-                            const newShape = JSON.parse(JSON.stringify(shape));
-                            if (newShape.type === 'polygon') {
-                                newShape.points.forEach(p => {
-                                    // p.x -= cropRect.x;
-                                    // p.y -= cropRect.y;
-                                });
-                            } else {
-                                // newShape.x1 -= cropRect.x;
-                                // newShape.y1 -= cropRect.y;
-                                // newShape.x2 -= cropRect.x;
-                                // newShape.y2 -= cropRect.y;
-                            }
-                            croppedShapes.push(newShape);
-                            continue;
-                        }
-                        
-                        // Handle images with a specialized, simpler clipping method
                         if (shape.type === 'image') {
-                            const imgX = Math.min(shape.x1, shape.x2);
-                            const imgY = Math.min(shape.y1, shape.y2);
+                            const img = shape.img;
                             const imgWidth = Math.abs(shape.x1 - shape.x2);
                             const imgHeight = Math.abs(shape.y1 - shape.y2);
 
-                            const intersectX = Math.max(imgX, cropRect.x);
-                            const intersectY = Math.max(imgY, cropRect.y);
-                            const intersectWidth = Math.min(imgX + imgWidth, cropRect.x + cropRect.width) - intersectX;
-                            const intersectHeight = Math.min(imgY + imgHeight, cropRect.y + cropRect.height) - intersectY;
+                            const intersectX = Math.max(shapeX1, cropRect.x);
+                            const intersectY = Math.max(shapeY1, cropRect.y);
+                            const intersectWidth = Math.min(shapeX2, cropRect.x + cropRect.width) - intersectX;
+                            const intersectHeight = Math.min(shapeY2, cropRect.y + cropRect.height) - intersectY;
 
                             if (intersectWidth > 0 && intersectHeight > 0) {
                                 const tempCanvas = document.createElement('canvas');
@@ -1165,50 +1143,63 @@ document.addEventListener('DOMContentLoaded', () => {
                                 tempCanvas.height = intersectHeight;
                                 const tempCtx = tempCanvas.getContext('2d');
 
-                                const sourceXInImage = (intersectX - imgX);
-                                const sourceYInImage = (intersectY - imgY);
+                                const sourceXInImage = (intersectX - shapeX1) * (img.naturalWidth / imgWidth);
+                                const sourceYInImage = (intersectY - shapeY1) * (img.naturalHeight / imgHeight);
+                                const sourceWidthInImage = intersectWidth * (img.naturalWidth / imgWidth);
+                                const sourceHeightInImage = intersectHeight * (img.naturalHeight / imgHeight);
 
-                                tempCtx.drawImage(shape.img, sourceXInImage, sourceYInImage, intersectWidth, intersectHeight, 0, 0, intersectWidth, intersectHeight);
+                                tempCtx.drawImage(
+                                    img, 
+                                    sourceXInImage, 
+                                    sourceYInImage, 
+                                    sourceWidthInImage, 
+                                    sourceHeightInImage, 
+                                    0, 0, 
+                                    intersectWidth, 
+                                    intersectHeight
+                                );
                                 
                                 const newImg = new Image();
-                                newImg.src = tempCanvas.toDataURL();
-                                // onload is not strictly needed if we don't re-render immediately,
-                                // but good practice if we did.
-                                
-                                croppedShapes.push({
-                                    ...shape,
-                                    id: Date.now() + Math.random(),
-                                    img: newImg,
-                                    x1: intersectX,
-                                    y1: intersectY,
-                                    x2: intersectX + intersectWidth,
-                                    y2: intersectY + intersectHeight,
-                                });
+                                const imageType = shape.originalType || 'image/png'; // Default to png if type is not stored
+                                const quality = (imageType === 'image/jpeg') ? 1.0 : undefined; // Use 1.0 quality for JPEGs
+                                newImg.src = tempCanvas.toDataURL(imageType, quality);
+
+                                newImg.onload = () => {
+                                    shape.img = newImg;
+                                    shape.x1 = intersectX;
+                                    shape.y1 = intersectY;
+                                    shape.x2 = intersectX + intersectWidth;
+                                    shape.y2 = intersectY + intersectHeight;
+                                    render(); // Re-render once the image is fully loaded
+                                };
+                                newShapesInActiveLayer.push(shape);
                             }
-                            continue; // Move to next shape
-                        }
-
-
-                        // For other vector shapes, use the clipping algorithm
-                        const clippedPoints = clip(subjectPoly, clipPoly);
-                        if (clippedPoints.length > 2) {
-                            const newShape = {
-                                ...shape,
-                                id: Date.now() + Math.random(),
-                                type: 'polygon',
-                                points: clippedPoints.map(p => ({
-                                    x: p.x,
-                                    y: p.y
-                                }))
-                            };
-                            croppedShapes.push(newShape);
+                        } else { // For vector shapes
+                            const clipPoly = [
+                                {x: cropRect.x, y: cropRect.y},
+                                {x: cropRect.x + cropRect.width, y: cropRect.y},
+                                {x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height},
+                                {x: cropRect.x, y: cropRect.y + cropRect.height}
+                            ];
+                            const clippedPoints = clip(shapePoly, clipPoly);
+                            if (clippedPoints.length > 2) {
+                                const newShape = {
+                                    ...shape,
+                                    id: Date.now() + Math.random(), // Assign new ID to clipped shape
+                                    type: 'polygon',
+                                    points: clippedPoints.map(p => ({ x: p.x, y: p.y }))
+                                };
+                                newShapesInActiveLayer.push(newShape);
+                            }
                         }
                     }
-                    layer.shapes = croppedShapes;
                 }
-
-                saveState('Crop Content');
+                layers[activeLayerIndex].shapes = newShapesInActiveLayer;
+                selectedShapes = [];
+                selectionRect = null;
                 updateLayerListUI();
+                render();
+                saveState('Crop Layer Content');
             }
         } else if (isMoving) {
             // Only save state if position actually changed from initial drag start
@@ -1299,7 +1290,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         y1: y,
                         x2: x + imgWidth,
                         y2: y + imgHeight,
-                        isVisible: true
+                        isVisible: true,
+                        originalType: file.type // Store original file type
                     };
                     activeLayer.shapes.push(newImage);
                     updateLayerListUI();
@@ -1334,6 +1326,8 @@ document.addEventListener('DOMContentLoaded', () => {
         filePopupPanel.style.display = filePopupPanel.style.display === 'block' ? 'none' : 'block';
         if (filePopupPanel.style.display === 'block') {
             updateCanvasInfo();
+            viewPopupPanel.style.display = 'none'; // Close view panel if file panel is opened
+            aboutPopupPanel.style.display = 'none'; // Close about panel if file panel is opened
         }
     });
 
@@ -1390,6 +1384,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update toggle states based on current panel visibility
             toggleLayersPanel.checked = layersPanel.style.display !== 'none';
             toggleHistoryPanel.checked = historyPanel.style.display !== 'none';
+            toggleGridPanel.checked = gridPanel.style.display !== 'none'; // Update toggle state
+            if (gridPanelSeparator) {
+                gridPanelSeparator.style.display = toggleGridPanel.checked ? 'block' : 'none';
+            }
+            filePopupPanel.style.display = 'none'; // Close file panel if view panel is opened
+            aboutPopupPanel.style.display = 'none'; // Close about panel if view panel is opened
         }
     });
 
@@ -1403,6 +1403,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     toggleHistoryPanel.addEventListener('change', (e) => {
         historyPanel.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    toggleGridPanel.addEventListener('change', (e) => {
+        if (gridPanel) {
+            const isChecked = e.target.checked;
+            gridPanel.style.display = isChecked ? 'block' : 'none';
+            if (gridPanelSeparator) {
+                gridPanelSeparator.style.display = isChecked ? 'block' : 'none';
+            }
+        }
+    });
+
+    aboutBtn.addEventListener('click', () => {
+        aboutPopupPanel.style.display = aboutPopupPanel.style.display === 'block' ? 'none' : 'block';
+        if (aboutPopupPanel.style.display === 'block') {
+            filePopupPanel.style.display = 'none'; // Close file panel if about panel is opened
+            viewPopupPanel.style.display = 'none'; // Close view panel if about panel is opened
+        }
+    });
+
+    closeAboutPopupBtn.addEventListener('click', () => {
+        aboutPopupPanel.style.display = 'none';
     });
 
     canvas.addEventListener('mousedown', handleMouseDown);

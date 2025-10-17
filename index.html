@@ -103,11 +103,20 @@
             <div id="layer-list">
                 <!-- Layers will be added here -->
             </div>
-            <button id="add-layer-btn">+ New Layer</button>
+            <div class="layer-actions">
+                <button id="add-layer-btn" title="Add Layer"><i class="bi bi-plus-lg"></i></button>
+                <button id="delete-layer-btn" title="Delete Layer"><i class="bi bi-trash-fill"></i></button>
+            </div>
         </div>
         <div id="export-panel" class="panel">
             <h3>Export</h3>
             <button id="export-btn">Export as PNG</button>
+        </div>
+        <div id="history-panel" class="panel">
+            <h3>History</h3>
+            <div id="history-list">
+                <!-- History items will be added here -->
+            </div>
         </div>
     </div>
 

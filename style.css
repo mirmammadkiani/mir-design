@@ -288,12 +288,16 @@ summary.layer-item.active {
     color: #007bff;
 }
 
-#add-layer-btn {
-
+.layer-actions {
+    display: flex;
+    gap: 8px;
     margin-top: 10px;
-    width: 100%;
+}
+
+.layer-actions button {
+    flex-grow: 1;
     padding: 8px;
-    font-size: 13px;
+    font-size: 16px;
 }
 
 /* New Layer Panel Tree Styles */
@@ -457,12 +461,110 @@ summary.layer-item.active {
 
     
 
-    #reset-zoom-btn:hover {
+        #reset-zoom-btn:hover {
 
-        background-color: #e9ecef;
+    
 
-        color: #333;
+    
+
+    
+
+            background-color: #e9ecef;
+
+    
+
+    
+
+    
+
+            color: #333;
+
+    
+
+    
+
+    
+
+        }
+
+    
+
+    
+
+    
+
+    .shape-item.dragging {
+
+    
+
+        opacity: 0.5;
+
+    
 
     }
 
     
+
+    
+
+    
+
+    .drop-indicator {
+
+    
+
+        height: 2px;
+
+    
+
+        background-color: #007bff;
+
+    
+
+        margin: 2px 10px;
+
+    
+
+        border-radius: 1px;
+
+    
+
+    }
+
+    
+
+    
+
+    
+
+        
+
+    
+
+    
+
+#history-list {
+    border: 1px solid #dee2e6;
+    background-color: #fff;
+    min-height: 100px;
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 4px;
+}
+
+.history-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e9ecef;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.history-item:hover {
+    background-color: #f1f3f5;
+}
+
+.history-item.active {
+    background-color: #e7f5ff;
+    font-weight: 600;
+    color: #007bff;
+}

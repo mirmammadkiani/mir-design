@@ -10,7 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const heightInput = document.getElementById('height-input');
     const colorPicker = document.getElementById('color-picker');
     const addLayerBtn = document.getElementById('add-layer-btn');
+    const deleteLayerBtn = document.getElementById('delete-layer-btn');
     const layerList = document.getElementById('layer-list');
+    const historyList = document.getElementById('history-list');
     const exportBtn = document.getElementById('export-btn');
     const eraserToolBtn = document.getElementById('eraser-tool');
     const gridToggle = document.getElementById('grid-toggle');
@@ -53,6 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectionRect = null;
     let selectedShapes = [];
+
+    // --- History (Undo/Redo) ---
+    let history = [];
+    let historyIndex = -1;
 
     // --- Drawing Logic ---
     function drawRectangle(context, shape) {
@@ -164,6 +170,76 @@ document.addEventListener('DOMContentLoaded', () => {
         link.click();
     }
 
+    // --- History Management ---
+    function saveState(actionName = 'Unnamed Action') {
+        if (historyIndex < history.length - 1) {
+            history.splice(historyIndex + 1);
+        }
+
+        const layersForHistory = layers.map(layer => ({
+            ...layer,
+            shapes: layer.shapes.map(shape => {
+                if (shape.type === 'image' && shape.img) {
+                    return { ...shape, imgSrc: shape.img.src, img: undefined };
+                }
+                return shape;
+            })
+        }));
+
+        history.push({
+            name: actionName,
+            layers: JSON.parse(JSON.stringify(layersForHistory))
+        });
+        historyIndex++;
+        updateHistoryUI();
+    }
+
+    function restoreState(state) {
+        const stateToRestore = JSON.parse(JSON.stringify(state.layers));
+        const imageLoadPromises = [];
+
+        layers = stateToRestore.map(layer => ({
+            ...layer,
+            shapes: layer.shapes.map(shape => {
+                if (shape.type === 'image' && shape.imgSrc) {
+                    const newImg = new Image();
+                    const promise = new Promise(resolve => {
+                        newImg.onload = () => resolve();
+                    });
+                    newImg.src = shape.imgSrc;
+                    imageLoadPromises.push(promise);
+                    return { ...shape, img: newImg };
+                }
+                return shape;
+            })
+        }));
+
+        updateLayerListUI();
+        render(); // Initial render
+
+        if (imageLoadPromises.length > 0) {
+            Promise.all(imageLoadPromises).then(() => {
+                render(); // Re-render after all images are loaded
+            });
+        }
+    }
+
+    function undo() {
+        if (historyIndex > 0) {
+            historyIndex--;
+            restoreState(history[historyIndex]);
+            updateHistoryUI();
+        }
+    }
+
+    function redo() {
+        if (historyIndex < history.length - 1) {
+            historyIndex++;
+            restoreState(history[historyIndex]);
+            updateHistoryUI();
+        }
+    }
+
     // --- Canvas and Layer Logic ---
     function render() {
         if (!artboardWidth || !artboardHeight) return;
@@ -180,12 +256,14 @@ document.addEventListener('DOMContentLoaded', () => {
         layers.forEach(layer => {
             if (layer.isVisible) {
                 layer.shapes.forEach(shape => {
-                    switch (shape.type) {
-                        case 'rectangle': drawRectangle(ctx, shape); break;
-                        case 'circle': drawCircle(ctx, shape); break;
-                        case 'line': drawLine(ctx, shape); break;
-                        case 'polygon': drawPolygon(ctx, shape); break;
-                        case 'image': drawImage(ctx, shape); break;
+                    if (shape.isVisible !== false) {
+                        switch (shape.type) {
+                            case 'rectangle': drawRectangle(ctx, shape); break;
+                            case 'circle': drawCircle(ctx, shape); break;
+                            case 'line': drawLine(ctx, shape); break;
+                            case 'polygon': drawPolygon(ctx, shape); break;
+                            case 'image': drawImage(ctx, shape); break;
+                        }
                     }
                 });
             }
@@ -313,6 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
         layers = [];
         addNewLayer();
         resetZoom();
+        history = [];
+        historyIndex = -1;
+        saveState('Initial State');
     }
 
     function addNewLayer() {
@@ -321,9 +402,11 @@ document.addEventListener('DOMContentLoaded', () => {
         setActiveLayer(layers.length - 1);
     }
 
-    function setActiveLayer(index) {
+    function setActiveLayer(index, rerender = true) {
         activeLayerIndex = index;
-        updateLayerListUI();
+        if (rerender) {
+            updateLayerListUI();
+        }
     }
 
     function updateLayerListUI() {
@@ -334,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const layerSummary = document.createElement('summary');
             layerSummary.classList.add('layer-item');
+            layerSummary.draggable = true;
             if (index === activeLayerIndex) {
                 layerSummary.classList.add('active');
             }
@@ -348,13 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
             layerName.classList.add('layer-name');
             layerName.dataset.index = index;
 
-            const deleteBtn = document.createElement('i');
-            deleteBtn.classList.add('bi', 'bi-trash-fill', 'delete-layer-btn');
-            deleteBtn.dataset.index = index;
-
             layerSummary.appendChild(visibilityToggle);
             layerSummary.appendChild(layerName);
-            layerSummary.appendChild(deleteBtn);
             
             layerDetails.appendChild(layerSummary);
 
@@ -364,6 +443,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const shapeIndex = layer.shapes.length - 1 - i;
                 const shapeItem = document.createElement('div');
                 shapeItem.classList.add('shape-item');
+                shapeItem.dataset.shapeId = shape.id;
+                shapeItem.draggable = true;
+
+                const shapeVisibilityToggle = document.createElement('i');
+                shapeVisibilityToggle.classList.add('bi', (shape.isVisible === false) ? 'bi-eye-slash-fill' : 'bi-eye-fill', 'shape-visibility');
+                shapeVisibilityToggle.dataset.layerIndex = index;
+                shapeVisibilityToggle.dataset.shapeIndex = shapeIndex;
                 
                 const shapeNameSpan = document.createElement('span');
                 shapeNameSpan.classList.add('shape-name');
@@ -371,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 shapeNameSpan.dataset.layerIndex = index;
                 shapeNameSpan.dataset.shapeIndex = shapeIndex;
 
+                shapeItem.appendChild(shapeVisibilityToggle);
                 shapeItem.appendChild(shapeNameSpan);
                 shapeList.appendChild(shapeItem);
             });
@@ -679,6 +766,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseUp() {
+        // If no action is in progress, do nothing. This prevents multiple triggers.
+        if (!isDrawing && !isErasing && !isSelecting && !isMoving && !isCropping && !isResizing && !isPanning) {
+             return;
+        }
+
         if (isPanning) {
             isPanning = false;
             if (currentTool === 'hand') {
@@ -691,19 +783,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const activeLayer = layers[activeLayerIndex];
         if (!activeLayer) return;
-
         if (isDrawing) {
+            const width = Math.abs(startPos.x - endPos.x);
+            const height = Math.abs(startPos.y - endPos.y);
+
+            // Prevent zero-area shapes (lines) and non-multiples of grid size
+            if (width === 0 || height === 0 || width % snapGridSize !== 0 || height % snapGridSize !== 0) {
+                isDrawing = false;
+                render();
+                return;
+            }
+            
+            const shapeX1 = Math.min(startPos.x, endPos.x);
+            const shapeY1 = Math.min(startPos.y, endPos.y);
+            const shapeX2 = Math.max(startPos.x, endPos.x);
+            const shapeY2 = Math.max(startPos.y, endPos.y);
+
+            // Prevent creating shapes outside the artboard
+            if (shapeX2 < 0 || shapeX1 > artboardWidth || shapeY2 < 0 || shapeY1 > artboardHeight) {
+                 isDrawing = false;
+                 render();
+                 return;
+            }
+
             const shapeName = currentTool.charAt(0).toUpperCase() + currentTool.slice(1);
-            activeLayer.shapes.push({ 
-                type: currentTool, 
+            activeLayer.shapes.push({
+                id: Date.now() + Math.random(),
+                type: currentTool,
                 name: shapeName,
-                color: currentColor, 
-                x1: startPos.x, y1: startPos.y, x2: endPos.x, y2: endPos.y 
+                color: currentColor,
+                x1: startPos.x, y1: startPos.y, x2: endPos.x, y2: endPos.y,
+                isVisible: true
             });
             updateLayerListUI();
+            saveState(`Draw ${currentTool}`);
         } else if (isErasing) {
             const eraseRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
             const initialShapeCount = activeLayer.shapes.length;
+            
+            const originalShapes = [...activeLayer.shapes];
             activeLayer.shapes = activeLayer.shapes.filter(shape => {
                 const shapePoly = shapeToPolygon(shape);
                 if (shapePoly.length === 0) return true;
@@ -711,8 +829,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const shapeX2 = Math.max(...shapePoly.map(p => p.x)), shapeY2 = Math.max(...shapePoly.map(p => p.y));
                 return !(shapeX1 < eraseRect.x + eraseRect.width && shapeX2 > eraseRect.x && shapeY1 < eraseRect.y + eraseRect.height && shapeY2 > eraseRect.y);
             });
+
             if (initialShapeCount !== activeLayer.shapes.length) {
+                saveState('Erase');
                 updateLayerListUI();
+            } else {
+                activeLayer.shapes = originalShapes;
             }
         } else if (isSelecting) {
             const userRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
@@ -721,6 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (isCropping) {
             const cropRect = { x: Math.min(startPos.x, endPos.x), y: Math.min(startPos.y, endPos.y), width: Math.abs(startPos.x - endPos.x), height: Math.abs(startPos.y - endPos.y) };
             if (cropRect.width > 0 && cropRect.height > 0) {
+                const originalShapesJSON = JSON.stringify(activeLayer.shapes);
                 const newShapes = [];
                 const clipPoly = [
                     {x: cropRect.x, y: cropRect.y}, 
@@ -748,32 +871,32 @@ document.addEventListener('DOMContentLoaded', () => {
                             tempCanvas.height = iHeight;
                             const tempCtx = tempCanvas.getContext('2d');
                             
-                            // sx, sy are the top-left coords of the source rect IN THE ORIGINAL IMAGE
                             const sx = (ix - imgX);
                             const sy = (iy - imgY);
 
                             tempCtx.drawImage(shape.img, sx, sy, iWidth, iHeight, 0, 0, iWidth, iHeight);
                             
                             const newImg = new Image();
-                            newImg.onload = () => render(); // Re-render when the new cropped image is ready
+                            newImg.onload = () => render();
                             newImg.src = tempCanvas.toDataURL();
 
                             newShapes.push({
+                                id: Date.now() + Math.random(),
                                 type: 'image',
                                 img: newImg,
                                 x1: ix,
                                 y1: iy,
                                 x2: ix + iWidth,
-                                y2: iy + iHeight
+                                y2: iy + iHeight,
+                                isVisible: shape.isVisible
                             });
                         }
-                        continue; // Go to next shape
+                        continue;
                     }
 
                     const subjectPoly = shapeToPolygon(shape);
                     if (subjectPoly.length === 0) continue;
 
-                    // Bounding box check for quick discard or inclusion
                     const shapeX1 = Math.min(...subjectPoly.map(p => p.x));
                     const shapeY1 = Math.min(...subjectPoly.map(p => p.y));
                     const shapeX2 = Math.max(...subjectPoly.map(p => p.x));
@@ -788,12 +911,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const clippedPoints = clip(subjectPoly, clipPoly);
                     if (clippedPoints.length > 2) {
-                        newShapes.push({ type: 'polygon', color: shape.color, points: clippedPoints });
+                        newShapes.push({ id: Date.now() + Math.random(), type: 'polygon', color: shape.color, points: clippedPoints, isVisible: shape.isVisible });
                     }
                 }
-                activeLayer.shapes = newShapes;
-                updateLayerListUI();
+
+                if (JSON.stringify(newShapes) !== originalShapesJSON) {
+                    saveState('Crop');
+                    activeLayer.shapes = newShapes;
+                    updateLayerListUI();
+                }
             }
+        } else if (isMoving || isResizing) {
+            saveState(isMoving ? 'Move Shape' : 'Resize Shape');
         }
 
         isDrawing = false; isErasing = false; isSelecting = false; isMoving = false; isCropping = false; isResizing = false;
@@ -804,7 +933,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Event Listeners ---
     createBtn.addEventListener('click', createArtboard);
-    addLayerBtn.addEventListener('click', addNewLayer);
+    addLayerBtn.addEventListener('click', () => {
+        addNewLayer();
+        saveState('Add Layer');
+    });
+
+    deleteLayerBtn.addEventListener('click', () => {
+        if (layers.length > 1 && activeLayerIndex > -1) {
+            layers.splice(activeLayerIndex, 1);
+            if (activeLayerIndex >= layers.length) {
+                activeLayerIndex = Math.max(0, layers.length - 1);
+            }
+            setActiveLayer(activeLayerIndex);
+            render();
+            saveState('Delete Layer');
+        }
+    });
     exportBtn.addEventListener('click', exportImage);
     eraserToolBtn.addEventListener('click', () => setCurrentTool('eraser'));
     rectangleToolBtn.addEventListener('click', () => setCurrentTool('rectangle'));
@@ -826,17 +970,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const activeLayer = layers[activeLayerIndex];
                 if (activeLayer) {
                     const newImage = {
+                        id: Date.now() + Math.random(),
                         type: 'image',
                         name: 'Image',
                         img: img,
                         x1: 0,
                         y1: 0,
                         x2: img.width,
-                        y2: img.height
+                        y2: img.height,
+                        isVisible: true
                     };
                     activeLayer.shapes.push(newImage);
                     updateLayerListUI();
                     render();
+                    saveState('Add Image');
                 }
             };
             img.src = event.target.result;
@@ -867,25 +1014,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     layerList.addEventListener('click', (e) => {
         const target = e.target;
-        if (target.classList.contains('delete-layer-btn')) {
-            const index = parseInt(target.dataset.index, 10);
-            layers.splice(index, 1);
-            if (activeLayerIndex >= index) {
-                activeLayerIndex = Math.max(0, activeLayerIndex - 1);
-            }
-            if (layers.length === 0) {
-                addNewLayer();
-            }
-            updateLayerListUI();
-            render();
-        } else if (target.classList.contains('layer-visibility')) {
+        if (target.classList.contains('layer-visibility')) {
             const index = parseInt(target.dataset.index, 10);
             layers[index].isVisible = !layers[index].isVisible;
             updateLayerListUI();
             render();
+        } else if (target.classList.contains('shape-visibility')) {
+            const layerIndex = parseInt(target.dataset.layerIndex, 10);
+            const shapeIndex = parseInt(target.dataset.shapeIndex, 10);
+            const shape = layers[layerIndex].shapes[shapeIndex];
+            shape.isVisible = shape.isVisible === false; // Toggle visibility
+            updateLayerListUI();
+            render();
         } else if (target.closest('.layer-item')) {
-            const index = parseInt(target.closest('.layer-item').dataset.index, 10);
-            setActiveLayer(index);
+            const layerItem = target.closest('.layer-item');
+            const index = parseInt(layerItem.dataset.index, 10);
+
+            if (activeLayerIndex !== index) {
+                if (activeLayerIndex !== -1) {
+                    const prevActiveLayer = layerList.querySelector(`.layer-item[data-index="${activeLayerIndex}"]`);
+                    if (prevActiveLayer) {
+                        prevActiveLayer.classList.remove('active');
+                    }
+                }
+                layerItem.classList.add('active');
+                setActiveLayer(index, false);
+            }
         }
     });
 
@@ -922,15 +1076,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('layer-name')) {
             const layerIndex = parseInt(target.dataset.index, 10);
             createRenameInput(target, (newName) => {
-                layers[layerIndex].name = newName;
-                updateLayerListUI();
+                if (layers[layerIndex].name !== newName && newName) {
+                    layers[layerIndex].name = newName;
+                    updateLayerListUI();
+                    saveState('Rename Layer');
+                }
             });
         } else if (target.classList.contains('shape-name')) {
             const layerIndex = parseInt(target.dataset.layerIndex, 10);
             const shapeIndex = parseInt(target.dataset.shapeIndex, 10);
             createRenameInput(target, (newName) => {
-                layers[layerIndex].shapes[shapeIndex].name = newName;
-                updateLayerListUI();
+                if (layers[layerIndex].shapes[shapeIndex].name !== newName && newName) {
+                    layers[layerIndex].shapes[shapeIndex].name = newName;
+                    updateLayerListUI();
+                    saveState('Rename Shape');
+                }
             });
         } else if (target.closest('.layer-item')) {
             // Toggle the <details> element on dblclick of the summary
@@ -941,11 +1101,187 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Drag and Drop Reordering ---
+    let draggedItemData = null;
+
+    layerList.addEventListener('dragstart', (e) => {
+        const target = e.target;
+        if (target.classList.contains('shape-item')) {
+            draggedItemData = {
+                type: 'shape',
+                id: target.dataset.shapeId
+            };
+        } else if (target.classList.contains('layer-item')) {
+            draggedItemData = {
+                type: 'layer',
+                index: parseInt(target.dataset.index, 10)
+            };
+        } else {
+            return;
+        }
+        setTimeout(() => { target.classList.add('dragging'); }, 0);
+    });
+
+    layerList.addEventListener('dragend', (e) => {
+        if (e.target.classList.contains('shape-item') || e.target.classList.contains('layer-item')) {
+            e.target.classList.remove('dragging');
+        }
+        draggedItemData = null;
+        removeDropIndicator();
+    });
+
+    layerList.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!draggedItemData) return;
+
+        let container, selector;
+
+        if (draggedItemData.type === 'shape') {
+            const detailsEl = e.target.closest('details');
+            if (!detailsEl) return;
+            container = detailsEl.querySelector('.shape-list');
+            selector = '.shape-item';
+        } else if (draggedItemData.type === 'layer') {
+            container = e.target.closest('#layer-list');
+            selector = '.layer-item';
+        } else {
+            return;
+        }
+        
+        if (container) {
+            const afterElement = getDragAfterElement(container, selector, e.clientY);
+            removeDropIndicator();
+            const indicator = document.createElement('div');
+            indicator.classList.add('drop-indicator');
+            if (afterElement) {
+                container.insertBefore(indicator, afterElement);
+            } else {
+                container.appendChild(indicator);
+            }
+        }
+    });
+
+    layerList.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!draggedItemData) return;
+
+        if (draggedItemData.type === 'shape') {
+            const detailsEl = e.target.closest('details');
+            if (!detailsEl) return;
+            const shapeList = detailsEl.querySelector('.shape-list');
+            if (!shapeList) return;
+
+            // Find source layer and shape
+            let sourceLayer, draggedShape, sourceShapeIndex;
+            for (const layer of layers) {
+                sourceShapeIndex = layer.shapes.findIndex(s => s.id == draggedItemData.id);
+                if (sourceShapeIndex > -1) {
+                    sourceLayer = layer;
+                    draggedShape = layer.shapes[sourceShapeIndex];
+                    break;
+                }
+            }
+
+            if (!sourceLayer) return;
+
+            // Find target layer
+            const targetLayerIndex = parseInt(shapeList.closest('details').querySelector('.layer-item').dataset.index, 10);
+            const targetLayer = layers[targetLayerIndex];
+
+            // Remove from source
+            sourceLayer.shapes.splice(sourceShapeIndex, 1);
+
+            // Find drop position and add to target
+            const afterElement = getDragAfterElement(shapeList, '.shape-item', e.clientY);
+            if (afterElement == null) {
+                // Dropped at the end of the UI list (bottom) -> becomes oldest (start of array)
+                targetLayer.shapes.unshift(draggedShape);
+            } else {
+                const afterShapeId = afterElement.dataset.shapeId;
+                const dropIndex = targetLayer.shapes.findIndex(s => s.id == afterShapeId);
+                targetLayer.shapes.splice(dropIndex, 0, draggedShape);
+            }
+            saveState('Move Shape');
+
+        } else if (draggedItemData.type === 'layer') {
+            const [draggedLayer] = layers.splice(draggedItemData.index, 1);
+            const afterElement = getDragAfterElement(layerList, '.layer-item', e.clientY);
+            if (afterElement == null) {
+                layers.push(draggedLayer);
+            } else {
+                const dropIndex = parseInt(afterElement.dataset.index, 10);
+                // Adjust index due to splice
+                const adjustedDropIndex = layers.findIndex((l, index) => index === dropIndex);
+                layers.splice(adjustedDropIndex, 0, draggedLayer);
+            }
+            saveState('Reorder Layer');
+        }
+
+        updateLayerListUI();
+        render();
+    });
+
+    function getDragAfterElement(container, selector, y) {
+        const draggableElements = [...container.querySelectorAll(`${selector}:not(.dragging)`)];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    function removeDropIndicator() {
+        const indicator = layerList.querySelector('.drop-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    function updateHistoryUI() {
+        historyList.innerHTML = '';
+        history.forEach((state, index) => {
+            const historyItem = document.createElement('div');
+            historyItem.classList.add('history-item');
+            if (index === historyIndex) {
+                historyItem.classList.add('active');
+            }
+            historyItem.textContent = state.name || `State ${index}`;
+            historyItem.dataset.index = index;
+            historyList.appendChild(historyItem);
+        });
+        // Scroll to the active item
+        const activeItem = historyList.querySelector('.history-item.active');
+        if (activeItem) {
+            activeItem.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    historyList.addEventListener('click', (e) => {
+        if (e.target.classList.contains('history-item')) {
+            const index = parseInt(e.target.dataset.index, 10);
+            if (index !== historyIndex) {
+                historyIndex = index;
+                restoreState(history[historyIndex]);
+                updateHistoryUI();
+            }
+        }
+    });
+
     zoomSlider.addEventListener('input', applyZoom);
     resetZoomBtn.addEventListener('click', resetZoom);
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === ' ' && !isSpacebarDown) {
+        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+            e.preventDefault();
+            undo();
+        } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
+            e.preventDefault();
+            redo();
+        } else if (e.key === ' ' && !isSpacebarDown) {
             isSpacebarDown = true;
             if (!isDrawing && !isMoving && !isResizing) {
                  canvas.style.cursor = 'grab';
@@ -960,6 +1296,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectionRect = null;
                 updateLayerListUI();
                 render();
+                saveState('Delete Shape');
             }
         }
 

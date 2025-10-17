@@ -4,7 +4,7 @@ body {
     margin: 0;
     height: 100vh;
     background-color: #f0f2f5; /* Lighter gray background */
-    color: #333;
+    color: #777; /* Even lighter gray text */
     display: flex;
     overflow: hidden;
 }
@@ -107,10 +107,11 @@ input[type="range"] {
     padding: 6px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    background-color: #fff;
+    background-color: #e0e0e0; /* Light gray background for range input */
     box-sizing: border-box;
     font-size: 13px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    accent-color: #e67e22; /* Orange accent color */
 }
 
 input[type="color"] {
@@ -128,6 +129,8 @@ input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; border-radius:
 input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 input[type="color"]::-moz-color-swatch { border: none; border-radius: 3px; }
 
+input[type="color"]::-moz-color-swatch { border: none; border-radius: 3px; }
+
 input:focus {
 
     outline: none;
@@ -138,7 +141,10 @@ input:focus {
 
 }
 
-
+#zoom-slider:focus {
+    box-shadow: none;
+    border-color: transparent; /* Also remove border color change on focus */
+}
 
 button, .tool-btn {
 
@@ -680,8 +686,57 @@ summary.layer-item.active {
     background-color: #f1f3f5;
 }
 
-.history-item.active {
-    background-color: #fae5d3;
+    .history-item.active {
+        background-color: #fae5d3;
+        font-weight: 600;
+        color: #e67e22;
+    }
+
+/* File Popup Panel */
+#file-popup-panel {
+    position: absolute;
+    top: 0;
+    left: 220px; /* Toolbar width */
+    width: 240px;
+    background-color: #ffffff;
+    border-right: 1px solid #d9d9d9;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 100;
+    padding: 20px;
+    box-sizing: border-box;
+    display: none; /* Hidden by default */
+}
+
+#view-popup-panel {
+    position: absolute;
+    top: 0;
+    left: 220px; /* Toolbar width */
+    width: 240px;
+    background-color: #ffffff;
+    border-right: 1px solid #d9d9d9;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 100;
+    padding: 20px;
+    box-sizing: border-box;
+    display: none; /* Hidden by default */
+}
+
+.popup-panel h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #888; /* Even lighter gray for headers */
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.popup-panel p,
+.popup-panel label {
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #555;
+}
+
+.popup-panel span {
     font-weight: 600;
-    color: #e67e22;
+    color: #333;
 }

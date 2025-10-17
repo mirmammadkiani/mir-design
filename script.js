@@ -32,6 +32,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const addImageBtn = document.getElementById('add-image-btn');
     const imageInput = document.getElementById('image-input');
 
+    // File Popup Elements
+    const fileBtn = document.getElementById('file-btn');
+    const filePopupPanel = document.getElementById('file-popup-panel');
+    const closeFilePopupBtn = document.getElementById('close-file-popup-btn');
+    const saveProjectBtn = document.getElementById('save-project-btn');
+    const loadProjectBtn = document.getElementById('load-project-btn');
+    const loadProjectInput = document.getElementById('load-project-input');
+    const canvasInfoWidth = document.getElementById('canvas-info-width');
+    const canvasInfoHeight = document.getElementById('canvas-info-height');
+    const canvasInfoZoom = document.getElementById('canvas-info-zoom');
+
+    // View UI Elements
+    const viewBtn = document.getElementById('view-btn');
+    const viewPopupPanel = document.getElementById('view-popup-panel');
+    const closeViewPopupBtn = document.getElementById('close-view-popup-btn');
+    const toggleLayersPanel = document.getElementById('toggle-layers-panel');
+    const toggleHistoryPanel = document.getElementById('toggle-history-panel');
+    const layersPanel = document.getElementById('layers-panel');
+    const historyPanel = document.getElementById('history-panel');
+
     // App State
     let artboardWidth = 0, artboardHeight = 0;
     let isDrawing = false, isErasing = false, isSelecting = false, isMoving = false, isCropping = false, isResizing = false, isPanning = false, isSpacebarDown = false;
@@ -112,6 +132,101 @@ document.addEventListener('DOMContentLoaded', () => {
         context.drawImage(shape.img, x, y, width, height);
     }
 
+    // --- Project Save/Load ---
+    function saveProject() {
+        const projectData = {
+            artboardWidth: artboardWidth,
+            artboardHeight: artboardHeight,
+            layers: layers.map(layer => ({
+                ...layer,
+                shapes: layer.shapes.map(shape => {
+                    if (shape.type === 'image' && shape.img) {
+                        return { ...shape, imgSrc: shape.img.src, img: undefined };
+                    }
+                    return shape;
+                })
+            })),
+            history: history.map(h => ({
+                ...h,
+                layers: h.layers.map(layer => ({
+                    ...layer,
+                    shapes: layer.shapes.map(shape => {
+                        if (shape.type === 'image' && shape.img) {
+                            return { ...shape, imgSrc: shape.img.src, img: undefined };
+                        }
+                        return shape;
+                    })
+                }))
+            })),
+            historyIndex: historyIndex
+        };
+
+        const dataStr = JSON.stringify(projectData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'artboard_project.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function loadProject(projectData) {
+        artboardWidth = projectData.artboardWidth;
+        artboardHeight = projectData.artboardHeight;
+
+        const imageLoadPromises = [];
+
+        layers = projectData.layers.map(layer => ({
+            ...layer,
+            shapes: layer.shapes.map(shape => {
+                if (shape.type === 'image' && shape.imgSrc) {
+                    const newImg = new Image();
+                    const promise = new Promise(resolve => {
+                        newImg.onload = () => resolve();
+                    });
+                    newImg.src = shape.imgSrc;
+                    imageLoadPromises.push(promise);
+                    return { ...shape, img: newImg };
+                }
+                return shape;
+            })
+        }));
+
+        history = projectData.history.map(h => ({
+            ...h,
+            layers: h.layers.map(layer => ({
+                ...layer,
+                shapes: layer.shapes.map(shape => {
+                    if (shape.type === 'image' && shape.imgSrc) {
+                        const newImg = new Image();
+                        const promise = new Promise(resolve => {
+                            newImg.onload = () => resolve();
+                        });
+                        newImg.src = shape.imgSrc;
+                        imageLoadPromises.push(promise);
+                        return { ...shape, img: newImg };
+                    }
+                    return shape;
+                })
+            }))
+        }));
+        historyIndex = projectData.historyIndex;
+
+        updateLayerListUI();
+        updateHistoryUI();
+        updateCanvasInfo();
+        render(); // Initial render
+
+        if (imageLoadPromises.length > 0) {
+            Promise.all(imageLoadPromises).then(() => {
+                render(); // Re-render after all images are loaded
+            });
+        }
+    }
+
     // --- Snap Logic ---
     function snap(value, gridSize) {
         if (!isSnapEnabled || gridSize <= 0) return value;
@@ -186,9 +301,19 @@ document.addEventListener('DOMContentLoaded', () => {
             })
         }));
 
+        const newLayersState = JSON.stringify(layersForHistory);
+
+        // Compare with the last state in history to avoid redundant entries
+        if (historyIndex >= 0) {
+            const lastLayersState = JSON.stringify(history[historyIndex].layers);
+            if (newLayersState === lastLayersState) {
+                return; // No change, do not save state
+            }
+        }
+
         history.push({
             name: actionName,
-            layers: JSON.parse(JSON.stringify(layersForHistory))
+            layers: JSON.parse(newLayersState) // Parse back to object
         });
         historyIndex++;
         updateHistoryUI();
@@ -486,6 +611,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         zoomSlider.value = zoomLevel * 100;
         render();
+        updateCanvasInfo(); // Update info after zoom reset
+    }
+
+    function updateCanvasInfo() {
+        canvasInfoWidth.textContent = artboardWidth;
+        canvasInfoHeight.textContent = artboardHeight;
+        canvasInfoZoom.textContent = Math.round(zoomLevel * 100);
     }
 
     // --- Vector Clipping & Polygon Logic ---
@@ -655,10 +787,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (currentTool === 'crop') {
             isCropping = true;
-            startPos = { x: snap(pos.x, snapGridSize), y: snap(pos.y, snapGridSize) };
+            startPos = isSnapEnabled ? { x: snap(pos.x, snapGridSize), y: snap(pos.y, snapGridSize) } : pos;
             endPos = startPos;
         } else {
-            pos = { x: snap(pos.x, snapGridSize), y: snap(pos.y, snapGridSize) };
+            pos = isSnapEnabled ? { x: snap(pos.x, snapGridSize), y: snap(pos.y, snapGridSize) } : pos;
             startPos = pos;
             endPos = pos;
             if (['rectangle', 'circle', 'line'].includes(currentTool)) isDrawing = true;
@@ -703,47 +835,144 @@ document.addEventListener('DOMContentLoaded', () => {
             const dx = pos.x - moveStartPos.x;
             const dy = pos.y - moveStartPos.y;
             const initial = selectionRect.initial;
+            const constrainProportions = e.shiftKey;
+            const initialAspectRatio = initial.width / initial.height;
 
             let newX = initial.x;
             let newY = initial.y;
             let newWidth = initial.width;
             let newHeight = initial.height;
 
-            if (resizeHandle.includes('right')) newWidth = initial.width + dx;
+            const minDimension = isSnapEnabled ? snapGridSize : 1; // Minimum dimension based on snap state
+
+            // Calculate potential new dimensions and position
+            if (resizeHandle.includes('right')) {
+                newWidth = initial.width + dx;
+            }
             if (resizeHandle.includes('left')) {
                 newWidth = initial.width - dx;
                 newX = initial.x + dx;
             }
-            if (resizeHandle.includes('bottom')) newHeight = initial.height + dy;
+            if (resizeHandle.includes('bottom')) {
+                newHeight = initial.height + dy;
+            }
             if (resizeHandle.includes('top')) {
                 newHeight = initial.height - dy;
                 newY = initial.y + dy;
             }
 
-            // Prevent flipping
-            if (newWidth < 1) {
-                newWidth = 1;
-                newX = selectionRect.x;
-            }
-            if (newHeight < 1) {
-                newHeight = 1;
-                newY = selectionRect.y;
+            // Apply proportion constraint if Shift is held
+            if (constrainProportions) {
+                let anchorX = initial.x;
+                let anchorY = initial.y;
+
+                // Determine the anchor point (opposite corner/side)
+                if (resizeHandle.includes('right')) anchorX = initial.x;
+                else if (resizeHandle.includes('left')) anchorX = initial.x + initial.width;
+
+                if (resizeHandle.includes('bottom')) anchorY = initial.y;
+                else if (resizeHandle.includes('top')) anchorY = initial.y + initial.height;
+
+                // Calculate current mouse position relative to the anchor point
+                const currentMouseXRelativeToAnchor = pos.x - anchorX;
+                const currentMouseYRelativeToAnchor = pos.y - anchorY;
+
+                // Calculate potential new width and height based on mouse position relative to anchor
+                let potentialNewWidth = Math.abs(currentMouseXRelativeToAnchor);
+                let potentialNewHeight = Math.abs(currentMouseYRelativeToAnchor);
+
+                // Determine the scale factor based on which dimension changed more, to maintain aspect ratio
+                let scaleFactor;
+                if (initial.width === 0 || initial.height === 0) {
+                    scaleFactor = 1; // Avoid division by zero, or handle as a special case
+                } else {
+                    const scaleX = potentialNewWidth / initial.width;
+                    const scaleY = potentialNewHeight / initial.height;
+                    scaleFactor = Math.max(scaleX, scaleY); // Use the larger scale to ensure it covers the mouse position
+                }
+
+                newWidth = initial.width * scaleFactor;
+                newHeight = initial.height * scaleFactor;
+
+                // Adjust newX and newY based on the anchor point and new dimensions
+                if (resizeHandle.includes('left')) newX = anchorX - newWidth;
+                else newX = anchorX;
+
+                if (resizeHandle.includes('top')) newY = anchorY - newHeight;
+                else newY = anchorY;
+
+                // Handle cases where newX/newY might need to be adjusted if anchor is not a corner
+                if (!resizeHandle.includes('left') && !resizeHandle.includes('right')) {
+                    // Vertical handles: center horizontally
+                    newX = initial.x + (initial.width - newWidth) / 2;
+                }
+                if (!resizeHandle.includes('top') && !resizeHandle.includes('bottom')) {
+                    // Horizontal handles: center vertically
+                    newY = initial.y + (initial.height - newHeight) / 2;
+                }
             }
 
-            const scaleX = newWidth / initial.width;
-            const scaleY = newHeight / initial.height;
+            // Prevent flipping and ensure minimum dimensions
+            if (newWidth < minDimension) {
+                newWidth = minDimension;
+                // Adjust newX if resizing from left
+                if (resizeHandle.includes('left')) {
+                    newX = initial.x + initial.width - minDimension;
+                }
+            }
+            if (newHeight < minDimension) {
+                newHeight = minDimension;
+                // Adjust newY if resizing from top
+                if (resizeHandle.includes('top')) {
+                    newY = initial.y + initial.height - minDimension;
+                }
+            }
+
+            if (isSnapEnabled) {
+                // Calculate the potential new corners
+                let x1_new = newX;
+                let y1_new = newY;
+                let x2_new = newX + newWidth;
+                let y2_new = newY + newHeight;
+
+                // Snap the corners
+                let snapped_x1 = snap(x1_new, snapGridSize);
+                let snapped_y1 = snap(y1_new, snapGridSize);
+                let snapped_x2 = snap(x2_new, snapGridSize);
+                let snapped_y2 = snap(y2_new, snapGridSize);
+
+                // Re-calculate newX, newY, newWidth, newHeight from snapped corners
+                newX = snapped_x1;
+                newY = snapped_y1;
+                newWidth = snapped_x2 - snapped_x1;
+                newHeight = snapped_y2 - snapped_y1;
+
+                // Ensure minimum width/height after snapping
+                if (newWidth < snapGridSize) newWidth = snapGridSize;
+                if (newHeight < snapGridSize) newHeight = snapGridSize;
+            }
+
+            // Recalculate scale factors based on potentially adjusted newWidth/Height
+            const finalScaleX = newWidth / initial.width;
+            const finalScaleY = newHeight / initial.height;
 
             selectedShapes.forEach(shape => {
                 if (shape.type === 'polygon') {
                     shape.points = shape.initialPoints.map(p => ({
-                        x: newX + (p.x - initial.x) * scaleX,
-                        y: newY + (p.y - initial.y) * scaleY
+                        x: newX + (p.x - initial.x) * finalScaleX,
+                        y: newY + (p.y - initial.y) * finalScaleY
                     }));
                 } else {
-                    shape.x1 = newX + (shape.initialX1 - initial.x) * scaleX;
-                    shape.y1 = newY + (shape.initialY1 - initial.y) * scaleY;
-                    shape.x2 = newX + (shape.initialX2 - initial.x) * scaleX;
-                    shape.y2 = newY + (shape.initialY2 - initial.y) * scaleY;
+                    // For simple shapes, update x1, y1, x2, y2 based on the new bounding box
+                    const initialShapeX1 = initial.x + (shape.initialX1 - initial.x);
+                    const initialShapeY1 = initial.y + (shape.initialY1 - initial.y);
+                    const initialShapeX2 = initial.x + (shape.initialX2 - initial.x);
+                    const initialShapeY2 = initial.y + (shape.initialY2 - initial.y);
+
+                    shape.x1 = newX + (initialShapeX1 - initial.x) * finalScaleX;
+                    shape.y1 = newY + (initialShapeY1 - initial.y) * finalScaleY;
+                    shape.x2 = newX + (initialShapeX2 - initial.x) * finalScaleX;
+                    shape.y2 = newY + (initialShapeY2 - initial.y) * finalScaleY;
                 }
             });
 
@@ -753,8 +982,19 @@ document.addEventListener('DOMContentLoaded', () => {
             selectionRect.height = newHeight;
 
         } else if (isMoving) {
-            const dx = pos.x - moveStartPos.x;
-            const dy = pos.y - moveStartPos.y;
+            let dx = pos.x - moveStartPos.x;
+            let dy = pos.y - moveStartPos.y;
+
+            if (isSnapEnabled) {
+                // Calculate snapped target position for the selection rectangle's top-left corner
+                const snappedTargetX = snap(selectionRect.initialX + dx, snapGridSize);
+                const snappedTargetY = snap(selectionRect.initialY + dy, snapGridSize);
+
+                // Adjust dx and dy to match the snapped movement
+                dx = snappedTargetX - selectionRect.initialX;
+                dy = snappedTargetY - selectionRect.initialY;
+            }
+
             selectedShapes.forEach(shape => {
                 if (shape.type === 'polygon') {
                     shape.points = shape.initialPoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
@@ -768,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectionRect.x = selectionRect.initialX + dx;
             selectionRect.y = selectionRect.initialY + dy;
         } else {
-             pos = { x: snap(pos.x, snapGridSize), y: snap(pos.y, snapGridSize) };
+             pos = isSnapEnabled ? { x: snap(pos.x, snapGridSize), y: snap(pos.y, snapGridSize) } : pos;
              endPos = pos;
         }
         render();
@@ -796,8 +1036,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const width = Math.abs(startPos.x - endPos.x);
             const height = Math.abs(startPos.y - endPos.y);
 
-            // Prevent zero-area shapes (lines) and non-multiples of grid size
-            if (width === 0 || height === 0 || width % snapGridSize !== 0 || height % snapGridSize !== 0) {
+            // Prevent zero-area shapes (lines)
+            if (width === 0 || height === 0 || (isSnapEnabled && (width % snapGridSize !== 0 || height % snapGridSize !== 0))) {
                 isDrawing = false;
                 render();
                 return;
@@ -858,11 +1098,11 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (cropRect.width > 0 && cropRect.height > 0) {
-                // Clamp cropRect to be within the artboard
-                cropRect.x = Math.max(0, cropRect.x);
-                cropRect.y = Math.max(0, cropRect.y);
-                cropRect.width = Math.min(artboardWidth - cropRect.x, cropRect.width);
-                cropRect.height = Math.min(artboardHeight - cropRect.y, cropRect.height);
+                // Clamp cropRect to be within the artboard - REMOVED, cropRect should be what user drew
+                // cropRect.x = Math.max(0, cropRect.x);
+                // cropRect.y = Math.max(0, cropRect.y);
+                // cropRect.width = Math.min(artboardWidth - cropRect.x, cropRect.width);
+                // cropRect.height = Math.min(artboardHeight - cropRect.y, cropRect.height);
 
                 const newShapes = [];
                 const clipPoly = [
@@ -970,13 +1210,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveState('Crop Content');
                 updateLayerListUI();
             }
-        } else if (isMoving || isResizing) {
-            saveState(isMoving ? 'Move Shape' : 'Resize Shape');
+        } else if (isMoving) {
+            // Only save state if position actually changed from initial drag start
+            if (selectionRect.x !== selectionRect.initialX || selectionRect.y !== selectionRect.initialY) {
+                saveState('Move Shape');
+            }
+        } else if (isResizing) {
+            // Only save state if dimensions or position actually changed from initial drag start
+            if (selectionRect.x !== selectionRect.initial.x ||
+                selectionRect.y !== selectionRect.initial.y ||
+                selectionRect.width !== selectionRect.initial.width ||
+                selectionRect.height !== selectionRect.initial.height) {
+                saveState('Resize Shape');
+            }
         }
 
         isDrawing = false; isErasing = false; isSelecting = false; isMoving = false; isCropping = false; isResizing = false;
         resizeHandle = null;
         startPos = null; endPos = null; moveStartPos = null;
+        hasResized = false; // Reset flag
+        hasMoved = false; // Reset flag
         render();
     }
 
@@ -1018,21 +1271,46 @@ document.addEventListener('DOMContentLoaded', () => {
             img.onload = () => {
                 const activeLayer = layers[activeLayerIndex];
                 if (activeLayer) {
+                    let imgWidth = img.width;
+                    let imgHeight = img.height;
+
+                    // Scale down image if it's larger than the artboard
+                    const aspectRatio = imgWidth / imgHeight;
+                    if (imgWidth > artboardWidth || imgHeight > artboardHeight) {
+                        if (imgWidth / artboardWidth > imgHeight / artboardHeight) {
+                            imgWidth = artboardWidth;
+                            imgHeight = imgWidth / aspectRatio;
+                        } else {
+                            imgHeight = artboardHeight;
+                            imgWidth = imgHeight * aspectRatio;
+                        }
+                    }
+
+                    // Center the image on the artboard
+                    const x = (artboardWidth - imgWidth) / 2;
+                    const y = (artboardHeight - imgHeight) / 2;
+
                     const newImage = {
                         id: Date.now() + Math.random(),
                         type: 'image',
                         name: 'Image',
                         img: img,
-                        x1: 0,
-                        y1: 0,
-                        x2: img.width,
-                        y2: img.height,
+                        x1: x,
+                        y1: y,
+                        x2: x + imgWidth,
+                        y2: y + imgHeight,
                         isVisible: true
                     };
                     activeLayer.shapes.push(newImage);
                     updateLayerListUI();
                     render();
                     saveState('Add Image');
+
+                    // Automatically select the newly added image
+                    setCurrentTool('select');
+                    selectedShapes = [newImage];
+                    selectionRect = { x: newImage.x1, y: newImage.y1, width: newImage.x2 - newImage.x1, height: newImage.y2 - newImage.y1 };
+                    render();
                 }
             };
             img.src = event.target.result;
@@ -1051,6 +1329,81 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newSize > 0) { snapGridSize = newSize; render(); }
     });
     colorPicker.addEventListener('change', (e) => currentColor = e.target.value);
+
+    fileBtn.addEventListener('click', () => {
+        filePopupPanel.style.display = filePopupPanel.style.display === 'block' ? 'none' : 'block';
+        if (filePopupPanel.style.display === 'block') {
+            updateCanvasInfo();
+        }
+    });
+
+    closeFilePopupBtn.addEventListener('click', () => {
+        filePopupPanel.style.display = 'none';
+    });
+
+    saveProjectBtn.addEventListener('click', saveProject);
+
+    loadProjectBtn.addEventListener('click', () => {
+        loadProjectInput.click(); // Trigger the hidden file input
+    });
+
+    function isValidProjectData(data) {
+        if (typeof data !== 'object' || data === null) return false;
+        if (typeof data.artboardWidth !== 'number' || typeof data.artboardHeight !== 'number') return false;
+        if (!Array.isArray(data.layers) || !Array.isArray(data.history)) return false;
+        if (typeof data.historyIndex !== 'number') return false;
+
+        // Basic check for layer and history item structure
+        if (data.layers.some(layer => typeof layer !== 'object' || !Array.isArray(layer.shapes))) return false;
+        if (data.history.some(h => typeof h !== 'object' || !Array.isArray(h.layers))) return false;
+
+        return true;
+    }
+
+    loadProjectInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const projectData = JSON.parse(event.target.result);
+                if (isValidProjectData(projectData)) {
+                    loadProject(projectData);
+                    filePopupPanel.style.display = 'none'; // Close popup after loading
+                } else {
+                    alert('Failed to load project. The file structure is invalid.');
+                }
+            } catch (error) {
+                console.error('Error loading project:', error);
+                alert('Failed to load project. The file might be corrupted or not a valid JSON file.');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset input so same file can be loaded again
+    });
+
+    // View Panel Event Listeners
+    viewBtn.addEventListener('click', () => {
+        viewPopupPanel.style.display = viewPopupPanel.style.display === 'block' ? 'none' : 'block';
+        if (viewPopupPanel.style.display === 'block') {
+            // Update toggle states based on current panel visibility
+            toggleLayersPanel.checked = layersPanel.style.display !== 'none';
+            toggleHistoryPanel.checked = historyPanel.style.display !== 'none';
+        }
+    });
+
+    closeViewPopupBtn.addEventListener('click', () => {
+        viewPopupPanel.style.display = 'none';
+    });
+
+    toggleLayersPanel.addEventListener('change', (e) => {
+        layersPanel.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    toggleHistoryPanel.addEventListener('change', (e) => {
+        historyPanel.style.display = e.target.checked ? 'block' : 'none';
+    });
 
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mousemove', handleMouseMove);

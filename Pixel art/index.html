@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Pixel Art Converter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Image to Pixel Art Converter</h1>
+        <p>Select an image to convert it to pixel art style. You can adjust the pixel size and color count.</p>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="fileInput" class="file-label">Select Image</label>
+                <input type="file" id="fileInput" accept="image/*">
+            </div>
+            <div class="control-group">
+                <label for="pixelSize">Pixel Size: <span id="pixelSizeValue">16</span></label>
+                <input type="range" id="pixelSize" min="2" max="256" value="16">
+            </div>
+            <div class="control-group">
+                <label for="colorCount">Color Count: <span id="colorCountValue">32</span></label>
+                <input type="range" id="colorCount" min="2" max="65536" value="32">
+            </div>
+
+            <div class="control-group">
+                <label for="scale">Scale:</label>
+                <input type="number" id="scale" value="1" min="1" max="10">
+            </div>
+            <button id="downloadBtn" disabled>Download Image</button>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <h2>Original Image</h2>
+                <canvas id="originalCanvas"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <h2>Pixel Art Result</h2>
+                <canvas id="pixelatedCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

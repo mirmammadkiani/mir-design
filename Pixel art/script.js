@@ -1,6 +1,8 @@
 const fileInput = document.getElementById('fileInput');
 const pixelSizeSlider = document.getElementById('pixelSize');
 const colorCountSlider = document.getElementById('colorCount');
+const pixelSizeNumber = document.getElementById('pixelSizeNumber');
+const colorCountNumber = document.getElementById('colorCountNumber');
 const scaleInput = document.getElementById('scale');
 const pixelSizeValue = document.getElementById('pixelSizeValue');
 const colorCountValue = document.getElementById('colorCountValue');
@@ -13,9 +15,18 @@ const pixelatedCtx = pixelatedCanvas.getContext('2d');
 
 let originalImage = null;
 
-// Update slider value display
+// Sync sliders and number inputs
 pixelSizeSlider.addEventListener('input', (e) => {
     pixelSizeValue.textContent = e.target.value;
+    pixelSizeNumber.value = e.target.value;
+    if (originalImage) {
+        pixelateImage();
+    }
+});
+
+pixelSizeNumber.addEventListener('input', (e) => {
+    pixelSizeValue.textContent = e.target.value;
+    pixelSizeSlider.value = e.target.value;
     if (originalImage) {
         pixelateImage();
     }
@@ -23,10 +34,20 @@ pixelSizeSlider.addEventListener('input', (e) => {
 
 colorCountSlider.addEventListener('input', (e) => {
     colorCountValue.textContent = e.target.value;
+    colorCountNumber.value = e.target.value;
     if (originalImage) {
         pixelateImage();
     }
 });
+
+colorCountNumber.addEventListener('input', (e) => {
+    colorCountValue.textContent = e.target.value;
+    colorCountSlider.value = e.target.value;
+    if (originalImage) {
+        pixelateImage();
+    }
+});
+
 
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];

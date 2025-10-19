@@ -97,8 +97,8 @@ function pixelateImage() {
     const colorCount = parseInt(colorCountSlider.value, 10);
 
     // 1. Downsample to create pixel effect
-    const smallWidth = originalCanvas.width / pixelSize;
-    const smallHeight = originalCanvas.height / pixelSize;
+    const smallWidth = Math.round(originalCanvas.width / pixelSize);
+    const smallHeight = Math.round(originalCanvas.height / pixelSize);
     
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');

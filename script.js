@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const handToolBtn = document.getElementById('hand-tool');
     const addImageBtn = document.getElementById('add-image-btn');
     const imageInput = document.getElementById('image-input');
+    const eyedropperToolBtn = document.getElementById('eyedropper-tool');
 
     // About Popup Elements
     const aboutBtn = document.getElementById('about-btn');
@@ -77,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let endPos = null;
     let moveStartPos = null;
     let panStartPos = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
+    let previousTool = 'rectangle';
     
     let layers = [];
     let activeLayerIndex = -1;
@@ -243,6 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Tool Management ---
     function setCurrentTool(tool) {
+        if (tool !== 'eyedropper') {
+            previousTool = currentTool;
+        }
         currentTool = tool;
         
         eraserToolBtn.classList.toggle('active', tool === 'eraser');
@@ -252,9 +257,12 @@ document.addEventListener('DOMContentLoaded', () => {
         selectToolBtn.classList.toggle('active', tool === 'select');
         cropToolBtn.classList.toggle('active', tool === 'crop');
         handToolBtn.classList.toggle('active', tool === 'hand');
+        eyedropperToolBtn.classList.toggle('active', tool === 'eyedropper');
         
         if (tool === 'hand') {
             canvas.style.cursor = 'grab';
+        } else if (tool === 'eyedropper') {
+            canvas.style.cursor = 'crosshair';
         } else if (['rectangle', 'circle', 'line', 'eraser', 'crop'].includes(tool)) {
             canvas.style.cursor = 'crosshair';
         } else {
@@ -742,6 +750,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return { x: mouseX, y: mouseY };
     }
 
+    function pickColor(x, y) {
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        const rgbToHex = (r, g, b) => '#' + [r, g, b].map(c => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
+        const hexColor = rgbToHex(pixel[0], pixel[1], pixel[2]);
+        colorPicker.value = hexColor;
+        currentColor = hexColor;
+        setCurrentTool(previousTool);
+    }
+
     function handleMouseDown(e) {
         if (isSpacebarDown || currentTool === 'hand') {
             isPanning = true;
@@ -751,6 +771,14 @@ document.addEventListener('DOMContentLoaded', () => {
             panStartPos.scrollY = viewport.scrollTop;
             canvas.style.cursor = 'grabbing';
             e.preventDefault();
+            return;
+        }
+
+        if (currentTool === 'eyedropper') {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            pickColor(x, y);
             return;
         }
 
@@ -1250,6 +1278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectToolBtn.addEventListener('click', () => setCurrentTool('select'));
     cropToolBtn.addEventListener('click', () => setCurrentTool('crop'));
     handToolBtn.addEventListener('click', () => setCurrentTool('hand'));
+    eyedropperToolBtn.addEventListener('click', () => setCurrentTool('eyedropper'));
     addImageBtn.addEventListener('click', () => imageInput.click());
 
     imageInput.addEventListener('change', (e) => {
@@ -1312,9 +1341,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     gridToggle.addEventListener('change', (e) => { isGridVisible = e.target.checked; render(); });
-    gridColorPicker.addEventListener('input', (e) => { gridColor = e.target.value; render(); });
+    gridColorPicker.addEventListener('change', (e) => { gridColor = e.target.value; render(); });
     guideGridToggle.addEventListener('change', (e) => { isGuideGridVisible = e.target.checked; render(); });
-    guideGridColorPicker.addEventListener('input', (e) => { guideGridColor = e.target.value; render(); });
+    guideGridColorPicker.addEventListener('change', (e) => { guideGridColor = e.target.value; render(); });
     snapToggle.addEventListener('change', (e) => { isSnapEnabled = e.target.checked; });
     snapSizeInput.addEventListener('input', (e) => {
         const newSize = parseInt(e.target.value, 10);
